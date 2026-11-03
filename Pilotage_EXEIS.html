@@ -1,0 +1,1499 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pilotage EXEIS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: dark project sidebar (navigation) + header bar + view canvas; the CR assistant slides in as a right drawer. Without a loaded file, a welcome screen replaces the app. */
+:root{
+  --bg:#f1f2f6; --surface:#ffffff; --surface-2:#f6f7fa; --ink:#161a24; --muted:#5c6375; --line:#dcdfe7; --line-2:#e8eaf0;
+  --accent:#3540b8; --accent-2:#e7e9fb; --accent-ink:#ffffff;
+  --ok:#1d8656; --ok-bg:#dff2e8; --warn:#ad6600; --warn-bg:#fbeed6; --bad:#c03a2d; --bad-bg:#fbe2de;
+  --chg:#e1a91c; --chg-bg:#fdf2d2; --plan:#9aa1b3;
+  --raci-a:#9b3a85; --raci-a-bg:#f6e3f1;
+  --side:#1a1e2b; --side-ink:#c5cad8; --side-hi:#ffffff; --side-line:#2b3142;
+  --f-disp:"Schibsted Grotesk",system-ui,"Segoe UI",sans-serif;
+  --f-ui:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1218; --surface:#171b24; --surface-2:#1c212c; --ink:#e5e8ef; --muted:#98a0b3; --line:#2a303d; --line-2:#222734;
+  --accent:#8c95ff; --accent-2:#252a4b; --accent-ink:#0f1218;
+  --ok:#4cc58c; --ok-bg:#15301f; --warn:#e6a94b; --warn-bg:#3a2c12; --bad:#f0806f; --bad-bg:#3b1d19;
+  --chg:#e0b23a; --chg-bg:#3a3012; --plan:#6c7488; --raci-a:#e48ccc; --raci-a-bg:#3a1f34;
+  --side:#0a0c11; --side-ink:#aab0c1; --side-hi:#ffffff; --side-line:#1f2430; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1218; --surface:#171b24; --surface-2:#1c212c; --ink:#e5e8ef; --muted:#98a0b3; --line:#2a303d; --line-2:#222734;
+  --accent:#8c95ff; --accent-2:#252a4b; --accent-ink:#0f1218;
+  --ok:#4cc58c; --ok-bg:#15301f; --warn:#e6a94b; --warn-bg:#3a2c12; --bad:#f0806f; --bad-bg:#3b1d19;
+  --chg:#e0b23a; --chg-bg:#3a3012; --plan:#6c7488; --raci-a:#e48ccc; --raci-a-bg:#3a1f34;
+  --side:#0a0c11; --side-ink:#aab0c1; --side-hi:#ffffff; --side-line:#1f2430; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.5}
+[hidden]{display:none!important}
+button{font:inherit;cursor:pointer;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--f-disp);margin:0;text-wrap:balance}
+
+/* welcome */
+.welcome{min-height:100%;display:grid;place-items:center;padding:32px 16px}
+.wcard{width:min(760px,100%);display:flex;flex-direction:column;gap:22px}
+.wcard .brand{font-family:var(--f-disp);font-weight:800;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.wcard h1{font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.wcard p.lead{margin:0;color:var(--muted);font-size:15px;max-width:60ch}
+.drop{border:2px dashed var(--line);border-radius:14px;background:var(--surface);padding:30px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-2)}
+.drop b{font-size:16px}
+.drop small{color:var(--muted)}
+.wopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.wopt{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px 16px;text-align:left;display:flex;flex-direction:column;gap:4px}
+.wopt:hover{border-color:var(--accent)}
+.wopt b{font-size:14px}
+.wopt span{font-size:12.5px;color:var(--muted)}
+.wnote{font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100%}
+.side{background:var(--side);color:var(--side-ink);padding:18px 12px;display:flex;flex-direction:column;gap:18px;position:sticky;top:0;height:100vh;overflow:auto}
+.logo{display:flex;flex-direction:column;gap:2px;padding:0 8px}
+.logo b{font-family:var(--f-disp);color:var(--side-hi);font-size:15px;letter-spacing:.02em}
+.logo span{font-size:11.5px;opacity:.75}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-sec{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;opacity:.55;padding:10px 10px 4px}
+.nav button{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:6px;font-size:13.5px}
+.nav button:hover{background:var(--side-line)}
+.nav button:focus-visible{outline:2px solid var(--accent)}
+.nav button[aria-current="page"]{background:var(--side-line);color:var(--side-hi);font-weight:600;box-shadow:inset 3px 0 0 var(--accent)}
+.badge{font-family:var(--f-mono);font-size:11px;padding:0 6px;border-radius:999px;background:var(--side-line);color:var(--side-ink)}
+.badge.bad{background:var(--bad);color:#fff}
+.side-foot{margin-top:auto;font-size:11.5px;padding:10px;border-top:1px solid var(--side-line);display:flex;flex-direction:column;gap:6px}
+.side-foot .file{display:flex;align-items:center;gap:6px;color:var(--side-hi);font-family:var(--f-mono);font-size:11.5px;word-break:break-all}
+.side-foot button{all:unset;cursor:pointer;color:var(--side-hi);text-decoration:underline;font-size:11.5px}
+.xls{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:3px;background:#1f7a4a;color:#fff;font-size:9px;font-weight:700;font-family:var(--f-ui);flex:none}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;padding:16px 28px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:5}
+.top-l{display:flex;flex-direction:column;gap:2px;min-width:0}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+.top h1{font-size:21px;font-weight:800;letter-spacing:-.01em}
+.top-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.meteo{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;font-weight:600;font-size:13px}
+.meteo i{width:10px;height:10px;border-radius:50%;background:currentColor}
+.m-vert{background:var(--ok-bg);color:var(--ok)} .m-orange{background:var(--warn-bg);color:var(--warn)} .m-rouge{background:var(--bad-bg);color:var(--bad)}
+.asof{font-size:12.5px;color:var(--muted)}
+.dirty{font-size:12px;font-weight:600;color:var(--warn)}
+.btn{border:1px solid var(--line);background:var(--surface);padding:7px 13px;border-radius:7px;font-size:13px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.save-hot{border-color:var(--warn);color:var(--warn);font-weight:600}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:4px 10px;font-size:12.5px}
+.view{padding:24px 28px 48px;display:flex;flex-direction:column;gap:20px;min-width:0}
+.vh{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+.vh h2{font-size:19px;font-weight:700}
+.vh p{margin:2px 0 0;color:var(--muted);font-size:13px;max-width:72ch}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g-wide{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel h3{font-size:14px;font-weight:700}
+.panel-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.panel-h small{color:var(--muted);font-size:12px}
+.empty{margin:0;color:var(--muted);font-size:13px}
+.warnbox{background:var(--warn-bg);color:var(--ink);border-radius:10px;padding:12px 16px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.warnbox b{color:var(--warn)}
+.warnbox ul{margin:0;padding-left:18px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tile .lbl{font-size:12px;color:var(--muted);font-weight:500}
+.tile .val{font-family:var(--f-disp);font-size:26px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.15;overflow-wrap:anywhere}
+.tile .val small{font-size:14px;font-weight:600;color:var(--muted)}
+.tile .sub{font-size:12px;color:var(--muted)}
+.rag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600}
+.rag i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.c-ok{color:var(--ok)} .c-warn{color:var(--warn)} .c-bad{color:var(--bad)} .c-mut{color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.p-ok{background:var(--ok-bg);color:var(--ok)} .p-warn{background:var(--warn-bg);color:var(--warn)} .p-bad{background:var(--bad-bg);color:var(--bad)} .p-run{background:var(--accent-2);color:var(--accent)} .p-mut{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.recent{box-shadow:0 0 0 2px var(--chg)!important}
+.tag-new{font-size:10.5px;font-weight:700;color:var(--chg);text-transform:uppercase;letter-spacing:.06em}
+.tw{overflow-x:auto}
+table.t{border-collapse:collapse;width:100%;font-size:13px}
+.t th{text-align:left;font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.t td{padding:9px 10px;border-bottom:1px solid var(--line-2);vertical-align:top}
+.t tr:last-child td{border-bottom:0}
+.t td.r,.t th.r{text-align:right}
+.t tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+.t tr.recent td{background:var(--chg-bg)}
+.t tr.recent{box-shadow:none!important}
+.idc{font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.att{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.att li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;font-size:13px}
+.sev{width:4px;align-self:stretch;border-radius:2px}
+.sev.bad{background:var(--bad)} .sev.warn{background:var(--warn)}
+.att small{color:var(--muted);display:block}
+.ms-row{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-2);font-size:13px}
+.ms-row:last-child{border-bottom:0}
+.ms-row.recent{box-shadow:none!important;background:var(--chg-bg)}
+.dia{width:11px;height:11px;transform:rotate(45deg);background:var(--accent);border-radius:2px;justify-self:center}
+.dia.done{background:var(--ok)} .dia.slip{background:var(--warn)}
+.meteo-card{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center}
+.sun{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-disp);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.sun.vert{background:var(--ok-bg);color:var(--ok);box-shadow:0 0 0 6px color-mix(in srgb,var(--ok) 15%,transparent)}
+.sun.orange{background:var(--warn-bg);color:var(--warn);box-shadow:0 0 0 6px color-mix(in srgb,var(--warn) 15%,transparent)}
+.sun.rouge{background:var(--bad-bg);color:var(--bad);box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 15%,transparent)}
+.reasons{margin:4px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+svg.chart{width:100%;height:auto;display:block}
+.chart .grid-l{stroke:var(--line-2);stroke-width:1}
+.chart .ax{fill:var(--muted);font-size:11px;font-family:var(--f-ui)}
+.chart .s-plan{fill:none;stroke:var(--plan);stroke-width:2;stroke-dasharray:5 4}
+.chart .s-real{fill:none;stroke:var(--accent);stroke-width:2.5}
+.chart .s-area{fill:var(--accent);opacity:.1}
+.chart .today{stroke:var(--bad);stroke-width:1.2;stroke-dasharray:3 3}
+.chart .dot{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+.chart .lab{fill:var(--ink);font-size:11.5px;font-weight:600;font-family:var(--f-ui)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.lg{display:inline-block;width:14px;height:3px;border-radius:2px}
+.donut-wrap{display:grid;grid-template-columns:140px minmax(0,1fr);gap:16px;align-items:center}
+.donut-leg{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.donut-leg div{display:flex;justify-content:space-between;gap:8px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.gantt{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.g-inner{min-width:max-content}
+.g-row{display:grid;grid-template-columns:290px auto;border-bottom:1px solid var(--line-2)}
+.g-row:last-child{border-bottom:0}
+.g-lab{position:sticky;left:0;background:var(--surface);z-index:2;padding:7px 12px;font-size:12.5px;border-right:1px solid var(--line);display:flex;gap:8px;align-items:center;min-width:0}
+.g-lab .idc{flex:none;width:36px}
+.g-lab .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-track{position:relative;height:34px}
+.g-head .g-lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;background:var(--surface-2)}
+.g-head .g-track{background:var(--surface-2);height:30px}
+.g-month{position:absolute;top:0;bottom:0;border-left:1px solid var(--line);font-size:11px;color:var(--muted);padding:7px 6px;white-space:nowrap}
+.g-phase .g-lab{font-weight:700;font-family:var(--f-disp);font-size:12.5px;background:var(--surface-2)}
+.g-phase .g-track{background:var(--surface-2);height:28px}
+.g-grid{position:absolute;top:0;bottom:0;border-left:1px solid var(--line-2)}
+.g-bar{position:absolute;top:9px;height:16px;border-radius:4px;background:var(--accent-2);overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+.g-bar i{display:block;height:100%;background:var(--accent)}
+.g-bar.late{border-color:color-mix(in srgb,var(--warn) 60%,transparent);background:var(--warn-bg)} .g-bar.late i{background:var(--warn)}
+.g-bar.done{border-color:color-mix(in srgb,var(--ok) 50%,transparent)} .g-bar.done i{background:var(--ok)}
+.g-pct{position:absolute;top:9px;font-size:11px;color:var(--muted);font-family:var(--f-mono);white-space:nowrap;line-height:16px}
+.g-ms{position:absolute;top:10px;width:14px;height:14px;transform:translateX(-7px) rotate(45deg);background:var(--accent);border-radius:2px}
+.g-ms.done{background:var(--ok)} .g-ms.slip{background:var(--warn)}
+.g-base{position:absolute;top:10px;width:14px;height:14px;transform:translateX(-7px) rotate(45deg);border:1.5px dashed var(--muted);border-radius:2px}
+.g-today{position:absolute;top:0;bottom:0;border-left:2px solid var(--bad);z-index:1}
+.g-row.recent{box-shadow:none!important}.g-row.recent .g-lab{background:var(--chg-bg)}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+select,input[type=text],input[type=password],textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px}
+select{padding:6px 9px;font-size:13px}
+.kanban{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:14px;overflow-x:auto;padding-bottom:4px}
+.kcol{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.kcol-h{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;font-family:var(--f-disp);padding:2px 4px}
+.kcol-h .n{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-weight:500}
+.kcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 11px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.kcard .top-line{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.kcard .ti{font-weight:600;line-height:1.35}
+.kcard .meta{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.prio{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted)}
+.prio i{width:7px;height:7px;border-radius:50%}
+.late-txt{color:var(--bad);font-weight:600}
+.kempty{font-size:12px;color:var(--muted);padding:6px 4px}
+.bbars{display:flex;flex-direction:column;gap:12px}
+.bb{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr) 92px;gap:12px;align-items:center;font-size:13px}
+.bb .nm small{display:block;color:var(--muted);font-size:11.5px}
+.bb-track{position:relative;height:18px;background:var(--surface-2);border-radius:4px;border:1px solid var(--line-2)}
+.bb-eng{position:absolute;top:0;bottom:0;left:0;background:repeating-linear-gradient(135deg,var(--accent-2) 0 5px,transparent 5px 9px);border-radius:4px 0 0 4px}
+.bb-real{position:absolute;top:0;bottom:0;left:0;background:var(--accent);border-radius:4px 0 0 4px}
+.bb-mk{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.bb-mk.over{background:var(--bad)}
+.bb .v{text-align:right;font-family:var(--f-mono);font-size:12.5px}
+.bb.recent{box-shadow:none!important;background:var(--chg-bg);border-radius:6px;padding:4px}
+.raci td.rc{text-align:center}
+.rl{display:inline-grid;place-items:center;min-width:30px;height:24px;padding:0 6px;border-radius:5px;font-family:var(--f-mono);font-weight:600;font-size:12px}
+.rl-R{background:var(--accent);color:var(--accent-ink)} .rl-A{background:var(--raci-a-bg);color:var(--raci-a);box-shadow:inset 0 0 0 1.5px var(--raci-a)}
+.rl-AR{background:var(--raci-a);color:var(--surface)} .rl-C{background:var(--warn-bg);color:var(--warn)} .rl-I{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.raci td.chg{background:var(--chg-bg)}
+.heat{display:grid;grid-template-columns:28px repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,72px) 24px;gap:4px}
+.hc{border-radius:6px;padding:5px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start}
+.h1{background:var(--ok-bg)} .h2{background:var(--warn-bg)} .h3{background:var(--bad-bg)} .h4{background:color-mix(in srgb,var(--bad) 40%,var(--bad-bg))}
+.hax{font-size:11px;color:var(--muted);display:grid;place-items:center}
+.rchip{font-family:var(--f-mono);font-size:11px;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.tl{display:flex;flex-direction:column}
+.tl-item{display:grid;grid-template-columns:96px 18px minmax(0,1fr);gap:12px;padding-bottom:18px}
+.tl-date{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:right;padding-top:2px}
+.tl-dot{position:relative;display:flex;justify-content:center}
+.tl-dot::before{content:"";position:absolute;top:0;bottom:-18px;width:2px;background:var(--line)}
+.tl-item:last-child .tl-dot::before{display:none}
+.tl-dot i{position:relative;width:12px;height:12px;border-radius:50%;background:var(--accent);margin-top:4px;box-shadow:0 0 0 3px var(--bg)}
+.tl-body{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.tl-body .meta{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.kv{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:6px 14px;font-size:13px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.ul{margin:0;padding-left:18px;font-size:13px;display:flex;flex-direction:column;gap:3px}
+.help{display:flex;flex-direction:column;gap:16px;max-width:860px}
+.help ol,.help ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.help p{margin:0;font-size:13.5px}
+.help code{font-family:var(--f-mono);font-size:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 35%,transparent);z-index:30}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(580px,100%);background:var(--surface);border-left:1px solid var(--line);z-index:31;display:flex;flex-direction:column;box-shadow:-12px 0 40px color-mix(in srgb,var(--ink) 18%,transparent)}
+.dr-h{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 14px) 18px 14px;border-bottom:1px solid var(--line)}
+.dr-h h2{font-size:16px}
+.dr-h small{color:var(--muted);font-size:12px;display:block}
+.x{border:0;background:transparent;font-size:22px;line-height:1;padding:4px 8px;border-radius:6px;color:var(--muted)}
+.x:hover{background:var(--surface-2)}
+.dr-b{padding:16px 18px 24px;overflow:auto;display:flex;flex-direction:column;gap:18px;flex:1}
+.stp{display:flex;flex-direction:column;gap:9px;border:1px solid var(--line);border-radius:10px;padding:14px}
+.stp.off{opacity:.5;pointer-events:none}
+.stp-t{display:flex;align-items:center;gap:9px;font-weight:700;font-family:var(--f-disp);font-size:14px}
+.stp-t .n{width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:12px;flex:none}
+.stp-t .n.done{background:var(--ok)}
+.stp p{margin:0;font-size:12.5px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);flex:1;min-width:140px}
+.field input,.field select{padding:6px 9px;font-size:13px}
+textarea{width:100%;padding:10px;font-size:12.5px;line-height:1.5;resize:vertical}
+textarea.cr{min-height:200px}
+textarea.code{min-height:110px;font-family:var(--f-mono);font-size:11.5px;background:var(--surface-2)}
+.msg{font-size:12.5px;min-height:1em}
+.msg.err{color:var(--bad)} .msg.ok{color:var(--ok)}
+.sumbox{background:var(--accent-2);border-radius:8px;padding:10px 12px;font-size:13px}
+.sumbox b{display:block}
+.pc{border:1px solid var(--line);border-radius:9px;padding:11px 12px;display:flex;flex-direction:column;gap:8px}
+.pc.off{opacity:.55}
+.pc.warned{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+.pc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pc-h input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);margin:0}
+.tg{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);background:var(--accent-2);padding:2px 7px;border-radius:4px}
+.op{font-size:12px;font-weight:600}
+.op.add{color:var(--ok)}
+.pc-h .conf{margin-left:auto}
+.chg-l{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 10px;font-size:12.5px;align-items:center}
+.chg-l .k{color:var(--muted)}
+.chg-l del{color:var(--muted)}
+.chg-l .nv{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
+.chg-l input{padding:3px 7px;font-size:12.5px;border:1px solid var(--chg);background:var(--chg-bg);border-radius:5px;min-width:0;flex:1;width:100%}
+.pc.isadd .chg-l input{border-color:var(--ok);background:var(--ok-bg)}
+.why{font-size:12.5px}
+.quote{font-size:12px;color:var(--muted);border-left:3px solid var(--line);padding-left:8px;font-style:italic}
+.checks{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.checks .ok{color:var(--ok)} .checks .w{color:var(--warn)}
+.apply-bar{position:sticky;bottom:-24px;background:var(--surface);padding:12px 0 4px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;z-index:40;max-width:calc(100% - 32px)}
+@media (max-width:1180px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g-wide{grid-template-columns:minmax(0,1fr)!important}}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;height:auto;flex-direction:row;align-items:center;gap:12px;padding:10px 16px;overflow-x:auto}
+  .nav{flex-direction:row;gap:4px}
+  .nav-sec,.side-foot{display:none}
+  .nav button{white-space:nowrap}
+  .logo{flex:none}
+  .top,.view{padding-left:16px;padding-right:16px}
+  .top{position:static}
+  .g2{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:560px){.g4,.wopts{grid-template-columns:minmax(0,1fr)}.bb{grid-template-columns:minmax(0,1fr)}.bb .v{text-align:left}.donut-wrap{grid-template-columns:minmax(0,1fr)}.tl-item{grid-template-columns:74px 14px minmax(0,1fr)}.wcard h1{font-size:27px}}
+@media (prefers-reduced-motion:no-preference){.drawer{animation:slide .22s ease-out}@keyframes slide{from{transform:translateX(30px);opacity:.4}}}
+/* Mode add-in (panneau Excel étroit) et fenêtre « grand écran » en lecture seule */
+.ro .ro-hide{display:none!important}
+@media (max-width:560px){.g-row{grid-template-columns:150px auto}.top h1{font-size:17px}.view{padding-top:16px}.heat{grid-template-rows:repeat(4,56px) 24px}}
+</style>
+</head>
+<body>
+
+<!-- ============ Écran d'accueil (aucun fichier ouvert) ============ -->
+<div class="welcome" id="welcome">
+  <div class="wcard">
+    <span class="brand">EXEIS Conseil · Pilotage de projet</span>
+    <h1>Ouvrez votre fichier de pilotage</h1>
+    <p class="lead">L'outil lit le fichier Excel du projet, l'affiche sous forme de tableau de bord et vous aide à intégrer les comptes rendus de réunion avec l'IA du cabinet. Le fichier reste sur votre poste.</p>
+    <div class="drop" id="drop">
+      <b>Glissez le fichier .xlsx ici</b>
+      <small>ou</small>
+      <button class="btn primary" id="btnOpen">Choisir un fichier Excel</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xlsm" hidden>
+    </div>
+    <div class="wopts">
+      <button class="wopt" id="btnExample"><b>Créer le fichier d'exemple</b><span>Projet « Atlas » complet (données fictives), pour découvrir l'outil.</span></button>
+      <button class="wopt" id="btnBlank"><b>Créer un fichier vierge</b><span>Le modèle EXEIS avec tous les onglets, prêt à remplir pour un vrai projet.</span></button>
+    </div>
+    <p class="wnote" id="libNote">Les fichiers créés ici s'ouvrent ensuite normalement dans Excel. Une connexion Internet est nécessaire au chargement de la page (bibliothèque de lecture Excel et polices).</p>
+  </div>
+</div>
+
+<!-- ============ Application ============ -->
+<div class="app" id="app" hidden>
+  <aside class="side" aria-label="Navigation">
+    <div class="logo"><b>EXEIS · Pilotage</b><span id="sideProj">Projet</span></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <span>Fichier ouvert</span>
+      <span class="file"><span class="xls">X</span><span id="fileName">—</span></span>
+      <span id="saveState">Enregistré</span>
+      <button id="btnClose" class="ro-hide">Fermer et ouvrir un autre fichier</button>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <div class="top-l">
+        <span class="eyebrow" id="topEyebrow"></span>
+        <h1 id="topTitle"></h1>
+      </div>
+      <div class="top-r">
+        <span class="asof" id="asof"></span>
+        <span class="meteo" id="meteoPill"><i></i><span></span></span>
+        <button class="btn ro-hide" id="btnBig" hidden>Grand écran</button>
+        <button class="btn ro-hide" id="btnSave">Enregistrer</button>
+        <button class="btn primary ro-hide" id="openCR">Intégrer un CR</button>
+      </div>
+    </header>
+    <main class="view" id="view"></main>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="drawer" id="drawer" hidden aria-label="Assistant CR" role="dialog" aria-modal="true">
+  <div class="dr-h">
+    <div><h2>Intégrer un compte rendu</h2><small id="drSub"></small></div>
+    <button class="x" id="closeCR" aria-label="Fermer">×</button>
+  </div>
+  <div class="dr-b">
+    <div class="stp" id="s1">
+      <div class="stp-t"><span class="n">1</span>Coller le compte rendu</div>
+      <div class="row">
+        <label class="field">Date de la réunion<input type="text" id="crDate" placeholder="JJ/MM/AAAA"></label>
+        <label class="field">Instance<select id="crInst"><option>Comité projet</option><option>COPIL</option><option>Atelier</option><option>Point technique</option><option>Réunion</option></select></label>
+        <label class="field">Validé par<input type="text" id="valBy" value="Consultant EXEIS"></label>
+      </div>
+      <textarea class="cr" id="crText" spellcheck="false" placeholder="Collez ici le texte du compte rendu…" aria-label="Texte du compte rendu"></textarea>
+      <div class="row">
+        <label class="field">Moteur IA<select id="iaMode"><option value="api">API Claude (analyse directe)</option><option value="paste">Copier-coller (Playground ou autre IA)</option></select></label>
+      </div>
+      <div class="row" id="apiBox">
+        <label class="field">Clé API<input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label>
+        <label class="field">Modèle<select id="apiModel"><option value="claude-opus-5-5">Claude Opus 5.5</option><option value="claude-sonnet-5-5">Claude Sonnet 5.5</option></select></label>
+        <label class="row" style="font-size:12px;color:var(--muted);flex-basis:100%"><input type="checkbox" id="apiRemember">Mémoriser la clé dans ce navigateur (poste personnel uniquement)</label>
+      </div>
+      <div class="row"><button class="btn primary" id="btnPrep">Préparer le prompt</button><button class="btn" id="btnStopApi" hidden>Arrêter</button><button class="btn sm" id="btnSampleCR" hidden>Charger le CR d'exemple</button></div>
+      <div class="msg" id="apiMsg" role="status"></div>
+    </div>
+    <div class="stp off" id="s2">
+      <div class="stp-t"><span class="n">2</span>Envoyer à Playground</div>
+      <p>Le prompt contient les instructions, l'état actuel du projet et le CR. Copiez-le, collez-le dans Playground, puis copiez la réponse complète de l'IA.</p>
+      <textarea class="code" id="prompt" readonly aria-label="Prompt généré"></textarea>
+      <div class="row"><button class="btn primary" id="btnCopy">Copier le prompt</button><span class="msg" id="copyMsg"></span></div>
+    </div>
+    <div class="stp off" id="s3">
+      <div class="stp-t"><span class="n">3</span>Coller la réponse de l'IA</div>
+      <textarea class="code" id="resp" spellcheck="false" placeholder='{"resume": "...", "modifications": [ ... ]}' aria-label="Réponse de l'IA"></textarea>
+      <div class="row"><button class="btn primary" id="btnRead">Lire les propositions</button><button class="btn sm" id="btnSim" hidden>Simuler la réponse (exemple)</button></div>
+      <div class="msg" id="readMsg"></div>
+    </div>
+    <div class="stp off" id="s4">
+      <div class="stp-t"><span class="n">4</span>Valider les propositions</div>
+      <div id="props"></div>
+    </div>
+  </div>
+</section>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+// =====================================================================
+//  Utilitaires
+// =====================================================================
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+const pd = s => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(s||"").trim()); return m ? new Date(+m[3], +m[2]-1, +m[1]) : null; };
+const fd = d => `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+const DAY = 864e5;
+const days = (a,b) => Math.round((b-a)/DAY);
+const shortD = d => d.toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+const keur = n => `${Math.round(Number(n)||0).toLocaleString("fr-FR")} k€`;
+const clone = o => JSON.parse(JSON.stringify(o));
+const squash = s => String(s??"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[’'`«»"“”]/g,"'").replace(/\s+/g," ").trim();
+const todayStr = () => fd(new Date());
+function toast(m, ms=3800){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true,ms); }
+const store = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
+
+// =====================================================================
+//  Structure du fichier Excel (onglets et colonnes)
+//  Types : id, text, date, pct (0-100), keur (k€), num, 1-4, ou liste de valeurs autorisées
+// =====================================================================
+const ENUM = {
+  actionStatut:["À faire","En cours","Bloqué","Terminé"], prio:["Haute","Moyenne","Basse"],
+  planStatut:["Planifié","En cours","Terminé","En retard"], ouiNon:["Oui","Non"],
+  risqueStatut:["Ouvert","Surveillé","Clos"], raci:["R","A","C","I","A/R",""],
+};
+const SHEETS = {
+  actions:{name:"Actions", prefix:"A", cols:[["ID","id"],["Action","text"],["Responsable","text"],["Création","date"],["Échéance","date"],["Statut",ENUM.actionStatut],["Priorité",ENUM.prio],["Source","text"]]},
+  planning:{name:"Planning", prefix:"T", cols:[["ID","id"],["Tâche","text"],["Phase","text"],["Début","date"],["Fin","date"],["Fin initiale","date"],["Avancement","pct"],["Responsable","text"],["Statut",ENUM.planStatut],["Jalon",ENUM.ouiNon]]},
+  budget:{name:"Budget", prefix:"B", cols:[["ID","id"],["Poste","text"],["Catégorie","text"],["Budget initial","keur"],["Engagé","keur"],["Réalisé","keur"],["Prévision fin","keur"],["Commentaire","text"]]},
+  raci:{name:"RACI", prefix:"L", cols:null /* ID, Livrable puis une colonne par acteur, lue dans le fichier */},
+  risques:{name:"Risques", prefix:"R", cols:[["ID","id"],["Risque","text"],["Catégorie","text"],["Probabilité","1-4"],["Impact","1-4"],["Plan de réponse","text"],["Propriétaire","text"],["Statut",ENUM.risqueStatut]]},
+  decisions:{name:"Décisions", prefix:"D", cols:[["ID","id"],["Date","date"],["Décision","text"],["Instance","text"],["Porteur","text"]]},
+  journal:{name:"Journal", cols:[["Date","date"],["Onglet","text"],["ID","text"],["Champ","text"],["Avant","text"],["Après","text"],["Source","text"],["Validé par","text"]]},
+  historique:{name:"Historique", cols:[["Date","date"],["Avancement réel (%)","num"],["Réalisé cumulé (k€)","num"],["Plan de dépenses cumulé (k€)","num"]]},
+};
+const FICHE_NAME = "Fiche projet";
+const AI_SHEETS = ["actions","planning","budget","raci","risques","decisions"];
+const DEFAULT_ACTORS = ["Sponsor","Direction métier","DSI","PMO EXEIS","Prestataire"];
+const colsOf = k => k==="raci" ? [["ID","id"],["Livrable","text"],...S.actors.map(a=>[a,ENUM.raci])] : SHEETS[k].cols;
+const editableCols = k => colsOf(k).filter(([c,t]) => t!=="id" && c!=="Fin initiale");
+const typeOf = (k,c) => (colsOf(k).find(([n])=>n===c)||[])[1];
+
+// =====================================================================
+//  État
+// =====================================================================
+let S = null;          // données du projet chargé
+let FILE = {name:"", handle:null, dirty:false};
+// addin : chargé dans Excel (lecture/écriture directe du classeur) ; readonly : fenêtre « grand écran » ouverte depuis l'add-in
+const MODE = { addin:false, readonly:false, dialog: new URLSearchParams(location.search).get("mode")==="dialog" };
+function emptyState(){ return { fiche:[], actors:[...DEFAULT_ACTORS], data:{actions:[],planning:[],budget:[],raci:[],risques:[],decisions:[]}, journal:[], historique:[], warnings:[], view:"synthese", resp:"Tous", recentRows:new Set(), recentCells:new Set(), proposals:[], resume:"" }; }
+const ficheGet = (rub, lib) => { const r = S.fiche.find(f => squash(f.Rubrique)===squash(rub) && (lib===undefined || squash(f.Libellé)===squash(lib))); return r ? String(r.Valeur ?? "") : ""; };
+const ficheList = rub => S.fiche.filter(f => squash(f.Rubrique)===squash(rub));
+function REF(){ const v = ficheGet("Identité","Date de situation"); return pd(v) || pd(todayStr()); }
+
+// =====================================================================
+//  Lecture du fichier Excel
+// =====================================================================
+const serialToStr = n => { const d = new Date(Math.round((n - 25569) * DAY)); return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)}/${d.getUTCFullYear()}`; };
+const strToSerial = s => { const d = pd(s); return d ? Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())/DAY + 25569 : null; };
+function normDate(v, ref){
+  const s=String(v??"").trim(); let m; ref = ref || pd(todayStr());
+  if(m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)) return `${pad(m[3])}/${pad(m[2])}/${m[1]}`;
+  if(m=/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/.exec(s)){ const y=m[3].length===2?"20"+m[3]:m[3]; return `${pad(m[1])}/${pad(m[2])}/${y}`; }
+  if(m=/^(\d{1,2})[\/.](\d{1,2})$/.exec(s)){ const c=[ref.getFullYear()-1,ref.getFullYear(),ref.getFullYear()+1].map(y=>new Date(y,+m[2]-1,+m[1])); c.sort((a,b)=>Math.abs(a-ref)-Math.abs(b-ref)); return fd(c[0]); }
+  return null;
+}
+function cellValue(cell, type, warn){
+  if(!cell || cell.v===undefined || cell.v===null || cell.v==="") return type==="keur"||type==="num" ? "" : "";
+  const v = cell.v;
+  if(type==="date"){
+    if(cell.t==="n") return serialToStr(v);
+    if(cell.t==="d") return fd(v);
+    const d = normDate(v); if(!d) warn(`date illisible « ${v} »`); return d || String(v);
+  }
+  if(type==="pct"){ let n = Number(typeof v==="string" ? v.replace(",",".").replace(/[^\d.-]/g,"") : v); if(isNaN(n)) { warn(`avancement illisible « ${v} »`); return 0; } if(cell.z && String(cell.z).includes("%")) n*=100; return Math.round(n); }
+  if(type==="keur"||type==="num"){ const n = Number(typeof v==="string" ? v.replace(/\s/g,"").replace(",",".").replace(/[^\d.-]/g,"") : v); if(isNaN(n)){ warn(`nombre illisible « ${v} »`); return ""; } return n; }
+  if(type==="1-4"){ const n=Math.round(Number(v)); if(!(n>=1&&n<=4)) warn(`valeur hors échelle 1-4 « ${v} »`); return isNaN(n)?"":n; }
+  if(Array.isArray(type)){ const hit = type.find(o => squash(o)===squash(v)); if(hit===undefined){ warn(`valeur « ${v} » non prévue`); return String(v).trim(); } return hit; }
+  if(cell.t==="n" && cell.w) return String(cell.w);
+  return String(v).trim();
+}
+function findSheet(wb, name){ const n = wb.SheetNames.find(s => squash(s)===squash(name)); return n ? wb.Sheets[n] : null; }
+function readGrid(ws){
+  if(!ws || !ws["!ref"]) return {head:[], rows:[]};
+  const r = XLSX.utils.decode_range(ws["!ref"]); const grid=[];
+  for(let R=r.s.r; R<=r.e.r; R++){ const line=[]; for(let C=r.s.c; C<=r.e.c; C++) line.push(ws[XLSX.utils.encode_cell({r:R,c:C})]); grid.push(line); }
+  const head = (grid[0]||[]).map(c => c ? String(c.v??"").trim() : "");
+  return {head, rows:grid.slice(1)};
+}
+function colIndex(head, name){ const n=squash(name); let i = head.findIndex(h=>squash(h)===n); if(i<0) i = head.findIndex(h=>squash(h).startsWith(n)); return i; }
+function loadWorkbook(wb){
+  const st = emptyState(); const W = st.warnings;
+  // Fiche projet
+  const fws = findSheet(wb, FICHE_NAME);
+  if(fws){ const {head,rows} = readGrid(fws); const iR=colIndex(head,"Rubrique"), iL=colIndex(head,"Libellé"), iV=colIndex(head,"Valeur");
+    rows.forEach(r => { const g = i => i>=0 && r[i] ? (r[i].t==="n" && /date de|démarrage|production|hypercare|situation/i.test(String(r[iL]?.v||"")) ? serialToStr(r[i].v) : String(r[i].w ?? r[i].v ?? "")) : "";
+      const o = {Rubrique:g(iR), "Libellé":g(iL), Valeur:g(iV)}; if(o.Rubrique||o.Libellé||o.Valeur) st.fiche.push(o); });
+  } else W.push(`Onglet « ${FICHE_NAME} » absent : il sera créé à l'enregistrement.`);
+  // RACI : acteurs = colonnes après « Livrable »
+  const rws = findSheet(wb, "RACI");
+  if(rws){ const {head} = readGrid(rws); const iLiv = colIndex(head,"Livrable"); const act = head.slice(iLiv+1).filter(h=>h && squash(h)!=="controle"); if(iLiv>=0 && act.length) st.actors = act; }
+  S = st; // nécessaire pour colsOf("raci")
+  for(const k of [...AI_SHEETS,"journal","historique"]){
+    const ws = findSheet(wb, SHEETS[k].name);
+    if(!ws){ W.push(`Onglet « ${SHEETS[k].name} » absent : il sera créé à l'enregistrement.`); continue; }
+    const {head, rows} = readGrid(ws); const cols = colsOf(k);
+    const idx = cols.map(([c]) => colIndex(head,c));
+    cols.forEach(([c,t],i) => { if(idx[i]<0 && t!=="id" && k!=="journal") W.push(`${SHEETS[k].name} : colonne « ${c} » absente.`); });
+    const list = [];
+    rows.forEach((r, ri) => {
+      if(!r.some(c => c && c.v!==undefined && c.v!=="")) return;
+      const o = {};
+      cols.forEach(([c,t],i) => { o[c] = cellValue(idx[i]>=0 ? r[idx[i]] : null, t, msg => W.push(`${SHEETS[k].name}, ligne ${ri+2}, ${c} : ${msg}`)); });
+      list.push(o);
+    });
+    if(AI_SHEETS.includes(k)){
+      list.forEach(o => { if(!o.ID){ o.ID = nextIdIn(list, k, o.Jalon==="Oui"); W.push(`${SHEETS[k].name} : identifiant ${o.ID} attribué à une ligne qui n'en avait pas.`); } });
+      const seen = new Set(); list.forEach(o => { if(seen.has(o.ID)) W.push(`${SHEETS[k].name} : identifiant ${o.ID} en double.`); seen.add(o.ID); });
+      if(k==="planning") list.forEach(o => { if(!o["Fin initiale"]) o["Fin initiale"] = o.Fin; if(!o.Jalon) o.Jalon = "Non"; if(o.Avancement==="") o.Avancement=0; });
+      st.data[k] = list;
+    } else st[k] = list;
+  }
+  st.journal.reverse(); // affichage : plus récent en premier
+  return st;
+}
+function nextIdIn(list, k, jalon){
+  const pre = k==="planning" ? (jalon?"J":"T") : SHEETS[k].prefix;
+  const nums = list.map(r=>String(r.ID||"")).filter(id=>id.startsWith(pre+"-")).map(id=>parseInt(id.split("-")[1],10)).filter(n=>!isNaN(n));
+  return `${pre}-${pad(Math.max(0,...nums)+1)}`;
+}
+
+// =====================================================================
+//  Écriture du fichier Excel
+// =====================================================================
+function makeSheet(cols, rows){
+  const ws = {}; const widths = cols.map(([c]) => Math.max(8, c.length+2));
+  cols.forEach(([c],j) => ws[XLSX.utils.encode_cell({r:0,c:j})] = {t:"s", v:c});
+  rows.forEach((o,i) => cols.forEach(([c,t],j) => {
+    const v = o[c]; const ref = XLSX.utils.encode_cell({r:i+1,c:j});
+    if(v===undefined || v===null || v==="") return;
+    if(t==="date" && strToSerial(v)!==null) ws[ref] = {t:"n", v:strToSerial(v), z:"dd/mm/yyyy"};
+    else if((t==="pct"||t==="keur"||t==="num"||t==="1-4") && !isNaN(Number(v))) ws[ref] = {t:"n", v:Number(v)};
+    else ws[ref] = {t:"s", v:String(v)};
+    widths[j] = Math.min(60, Math.max(widths[j], String(v).length+2));
+  }));
+  const last = XLSX.utils.encode_cell({r:Math.max(rows.length,1), c:cols.length-1});
+  ws["!ref"] = `A1:${last}`; ws["!cols"] = widths.map(w=>({wch:w})); ws["!autofilter"] = {ref:`A1:${XLSX.utils.encode_cell({r:Math.max(rows.length,1),c:cols.length-1})}`};
+  return ws;
+}
+function toWorkbook(){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, makeSheet([["Rubrique","text"],["Libellé","text"],["Valeur","text"]], S.fiche.map(f => ({...f, Valeur: f.Valeur}))), FICHE_NAME);
+  for(const k of AI_SHEETS) XLSX.utils.book_append_sheet(wb, makeSheet(colsOf(k), S.data[k]), SHEETS[k].name);
+  XLSX.utils.book_append_sheet(wb, makeSheet(SHEETS.journal.cols, [...S.journal].reverse()), SHEETS.journal.name);
+  XLSX.utils.book_append_sheet(wb, makeSheet(SHEETS.historique.cols, S.historique), SHEETS.historique.name);
+  wb.Props = {Title:"Fichier de pilotage EXEIS", Author:"EXEIS Conseil"};
+  return wb;
+}
+
+// =====================================================================
+//  Ouverture / enregistrement (accès direct au fichier quand le navigateur le permet)
+// =====================================================================
+const canPick = typeof window.showOpenFilePicker === "function";
+async function openFile(){
+  if(canPick){
+    try{ const [h] = await window.showOpenFilePicker({types:[{description:"Classeur Excel",accept:{"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":[".xlsx"]}}]}); return loadFromFile(await h.getFile(), h); }
+    catch(e){ if(e && e.name==="AbortError") return; }
+  }
+  $("fileInput").click();
+}
+$("btnOpen").onclick = openFile;
+$("fileInput").onchange = e => { const f=e.target.files[0]; if(f) loadFromFile(f, null); e.target.value=""; };
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", async e => {
+  const item = e.dataTransfer.items && e.dataTransfer.items[0]; let handle=null;
+  if(item && item.getAsFileSystemHandle){ try{ handle = await item.getAsFileSystemHandle(); }catch(err){} }
+  const f = handle && handle.kind==="file" ? await handle.getFile() : e.dataTransfer.files[0];
+  if(f) loadFromFile(f, handle && handle.kind==="file" ? handle : null);
+});
+async function loadFromFile(f, handle){
+  if(!window.XLSX){ toast("La bibliothèque de lecture Excel n'a pas pu se charger. Vérifiez la connexion Internet puis rechargez la page."); return; }
+  if(!/\.xlsx$|\.xlsm$/i.test(f.name)){ toast("Choisissez un fichier Excel (.xlsx)."); return; }
+  try{
+    const wb = XLSX.read(await f.arrayBuffer(), {type:"array", cellNF:true, cellDates:false});
+    S = loadWorkbook(wb); FILE = {name:f.name, handle, dirty:false}; startApp();
+    toast(S.warnings.length ? `Fichier ouvert avec ${S.warnings.length} remarque(s) : voir la Synthèse.` : `« ${f.name} » ouvert.`);
+  }catch(e){ console.error(e); toast("Impossible de lire ce fichier. Vérifiez qu'il s'agit bien d'un classeur Excel non protégé par mot de passe."); }
+}
+async function saveFile(){
+  if(MODE.addin) return addinReload();
+  const buf = XLSX.write(toWorkbook(), {type:"array", bookType:"xlsx"});
+  if(!FILE.handle && typeof window.showSaveFilePicker === "function"){
+    try{ FILE.handle = await window.showSaveFilePicker({suggestedName:FILE.name, types:[{description:"Classeur Excel",accept:{"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":[".xlsx"]}}]}); FILE.name = FILE.handle.name; }
+    catch(e){ if(e && e.name==="AbortError") return; FILE.handle=null; }
+  }
+  if(FILE.handle){
+    try{ const w = await FILE.handle.createWritable(); await w.write(buf); await w.close(); setDirty(false); toast(`Enregistré dans « ${FILE.name} ».`); return; }
+    catch(e){ console.error(e); toast("Enregistrement impossible : le fichier est peut-être ouvert dans Excel. Fermez-le dans Excel puis cliquez à nouveau sur Enregistrer.", 6500); return; }
+  }
+  // Repli : téléchargement d'une copie
+  const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = FILE.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  setDirty(false); toast("Le fichier a été téléchargé. Remplacez l'ancienne version par celle-ci dans le dossier du projet.", 6500);
+}
+function setDirty(v){
+  if(MODE.addin || MODE.readonly){ FILE.dirty=false; $("saveState").textContent = MODE.readonly ? "Lecture seule (grand écran)" : "Lié au classeur ouvert"; $("saveState").className=""; $("btnSave").classList.remove("save-hot"); $("btnSave").textContent="Relire le classeur"; return; }
+  FILE.dirty=v; $("saveState").textContent = v ? "Modifications non enregistrées" : "Enregistré"; $("saveState").className = v ? "dirty" : ""; $("btnSave").classList.toggle("save-hot", v); $("btnSave").textContent = v ? "Enregistrer *" : "Enregistrer"; }
+$("btnSave").onclick = saveFile;
+window.addEventListener("beforeunload", e => { if(FILE.dirty){ e.preventDefault(); e.returnValue=""; } });
+document.addEventListener("keydown", e => { if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="s" && S){ e.preventDefault(); saveFile(); } });
+$("btnClose").onclick = () => { if(FILE.dirty && !closeArmed){ closeArmed=true; toast("Des modifications ne sont pas enregistrées. Cliquez à nouveau pour fermer sans enregistrer."); setTimeout(()=>closeArmed=false,5000); return; } closeArmed=false; S=null; FILE={name:"",handle:null,dirty:false}; $("app").hidden=true; $("welcome").hidden=false; };
+let closeArmed=false;
+
+// =====================================================================
+//  Fichier d'exemple et fichier vierge
+// =====================================================================
+function exampleState(){
+  const st = emptyState();
+  st.fiche = [
+    ["Identité","Projet","Atlas"],["Identité","Intitulé","Refonte du portail client et migration CRM"],["Identité","Client","Garonne Mutuelle (fictif)"],["Identité","Direction","DSI"],
+    ["Identité","Date de démarrage","07/09/2026"],["Identité","Date de mise en production","01/03/2027"],["Identité","Fin d'hypercare","31/03/2027"],
+    ["Identité","Méthode","Hybride : conception en cycle en V, réalisation en sprints de 3 semaines"],
+    ["Identité","Date de situation","14/10/2026"],
+    ["Objectif","1","Offrir aux adhérents un espace client en ligne (contrats, demandes, documents)"],["Objectif","2","Remplacer le CRM historique par une solution SaaS d'ici mars 2027"],["Objectif","3","Réduire de 30 % les appels au centre de relation client sur les demandes simples"],
+    ["Inclus","","Portail adhérents web et mobile"],["Inclus","","Migration des données CRM (420 000 fiches)"],["Inclus","","Interfaces avec le SI contrats et la GED"],["Inclus","","Formation des 180 conseillers"],
+    ["Exclu","","Refonte du SI contrats"],["Exclu","","Application mobile native"],["Exclu","","Portail courtiers (phase 2)"],
+    ["Équipe","Sponsor","D. Lefèvre, Directeur Relation client"],["Équipe","Chef de projet métier","S. Blanc"],["Équipe","Chef de projet DSI","N. Garcia"],["Équipe","RSSI","P. Morel"],["Équipe","Intégrateur","K. Haddad (directeur de projet)"],["Équipe","PMO","EXEIS Conseil"],
+    ["Gouvernance","COPIL","Mensuel · Sponsor, Dir. Relation client, DSI, PMO"],["Gouvernance","Comité projet","Hebdomadaire · Chefs de projet, intégrateur, PMO"],["Gouvernance","Point technique","Bi-hebdomadaire · DSI, RSSI, intégrateur"],
+  ].map(([a,b,c])=>({Rubrique:a,"Libellé":b,Valeur:c}));
+  st.actors = ["Sponsor","Dir. Relation client","DSI","RSSI","PMO EXEIS","Intégrateur"];
+  const A = (ID,Action,Responsable,Création,Échéance,Statut,Priorité,Source) => ({ID,Action,Responsable,"Création":Création,"Échéance":Échéance,Statut,"Priorité":Priorité,Source});
+  st.data.actions = [
+    A("A-01","Valider la note de cadrage","D. Lefèvre (Sponsor)","15/09/2026","29/09/2026","Terminé","Haute","COPIL du 15/09/2026"),
+    A("A-02","Nommer les key users par agence","S. Blanc (Métier)","22/09/2026","09/10/2026","En cours","Haute","Comité projet du 22/09/2026"),
+    A("A-03","Fournir les jeux de données CRM anonymisés","N. Garcia (DSI)","29/09/2026","16/10/2026","En cours","Haute","COPIL du 29/09/2026"),
+    A("A-04","Valider la politique d'authentification SSO","P. Morel (RSSI)","29/09/2026","12/10/2026","Bloqué","Haute","COPIL du 29/09/2026"),
+    A("A-05","Planifier les ateliers de spécification contrats","PMO EXEIS","06/10/2026","13/10/2026","Terminé","Moyenne","Comité projet du 06/10/2026"),
+    A("A-06","Transmettre le contrat de licences signé","L. Vidal (Achats)","06/10/2026","23/10/2026","À faire","Moyenne","Comité projet du 06/10/2026"),
+    A("A-07","Rédiger le plan de conduite du changement","PMO EXEIS","06/10/2026","06/11/2026","À faire","Moyenne","Comité projet du 06/10/2026"),
+    A("A-08","Mettre à disposition l'environnement de recette","N. Garcia (DSI)","13/10/2026","13/11/2026","À faire","Haute","Comité projet du 13/10/2026"),
+  ];
+  const T = (ID,Tâche,Phase,Début,Fin,Av,Resp,Statut,Jalon="Non") => ({ID,"Tâche":Tâche,Phase,"Début":Début,Fin,"Fin initiale":Fin,Avancement:Av,Responsable:Resp,Statut,Jalon});
+  st.data.planning = [
+    T("T-01","Cadrage et note de cadrage","Cadrage","07/09/2026","25/09/2026",100,"PMO EXEIS","Terminé"),
+    T("J-01","Validation du cadrage en COPIL","Cadrage","29/09/2026","29/09/2026",100,"Sponsor","Terminé","Oui"),
+    T("T-02","Spécifications fonctionnelles du portail","Conception","28/09/2026","23/10/2026",70,"Métier","En cours"),
+    T("T-03","Architecture technique et sécurité","Conception","28/09/2026","16/10/2026",80,"DSI","En cours"),
+    T("T-04","Spécifications des interfaces CRM / SI","Conception","05/10/2026","30/10/2026",30,"Intégrateur","En cours"),
+    T("J-02","Fin de conception","Conception","30/10/2026","30/10/2026",0,"Comité projet","Planifié","Oui"),
+    T("T-05","Sprint 1 : socle et authentification","Réalisation","02/11/2026","20/11/2026",0,"Intégrateur","Planifié"),
+    T("T-06","Sprint 2 : espace client et contrats","Réalisation","23/11/2026","11/12/2026",0,"Intégrateur","Planifié"),
+    T("T-07","Sprint 3 : demandes et suivi","Réalisation","14/12/2026","22/01/2027",0,"Intégrateur","Planifié"),
+    T("T-08","Développement des interfaces","Réalisation","16/11/2026","15/01/2027",0,"Intégrateur","Planifié"),
+    T("T-09","Migration des données CRM (lots d'essai)","Données","02/11/2026","29/01/2027",0,"DSI","Planifié"),
+    T("T-10","Recette fonctionnelle (VABF)","Recette","25/01/2027","12/02/2027",0,"Métier","Planifié"),
+    T("J-03","PV de recette","Recette","12/02/2027","12/02/2027",0,"Sponsor","Planifié","Oui"),
+    T("T-11","Formation des conseillers","Déploiement","08/02/2027","19/02/2027",0,"PMO EXEIS","Planifié"),
+    T("T-12","Bascule et mise en production","Déploiement","26/02/2027","01/03/2027",0,"DSI","Planifié"),
+    T("J-04","Mise en production","Déploiement","01/03/2027","01/03/2027",0,"Sponsor","Planifié","Oui"),
+    T("T-13","Hypercare","Déploiement","01/03/2027","31/03/2027",0,"Intégrateur","Planifié"),
+  ];
+  const B = (ID,Poste,Cat,Ini,Eng,Real,Prev,Com="") => ({ID,Poste,"Catégorie":Cat,"Budget initial":Ini,"Engagé":Eng,"Réalisé":Real,"Prévision fin":Prev,Commentaire:Com});
+  st.data.budget = [
+    B("B-01","AMOA et PMO EXEIS","Prestations",180,180,52,180),
+    B("B-02","Intégrateur : développement du portail","Prestations",320,320,38,320),
+    B("B-03","Intégrateur : interfaces","Prestations",140,140,12,155,"Complexité API contrats : +15 k€ (comité du 06/10)"),
+    B("B-04","Licences CRM (année 1)","Licences",160,160,160,160,"Facturé à la commande"),
+    B("B-05","Infrastructure cloud","Infrastructure",60,25,8,60),
+    B("B-06","Formation et conduite du changement","Prestations",50,0,0,50),
+    B("B-07","Provision pour risques","Provision",70,0,0,55,"15 k€ réaffectés à B-03"),
+  ];
+  const L = (ID,Liv,...v) => { const o={ID,Livrable:Liv}; st.actors.forEach((a,i)=>o[a]=v[i]); return o; };
+  st.data.raci = [
+    L("L-01","Note de cadrage","A","C","C","I","R","I"), L("L-02","Spécifications fonctionnelles","I","A","C","I","R","C"),
+    L("L-03","Architecture technique","I","I","A","C","I","R"), L("L-04","Développements et interfaces","I","C","A","I","I","R"),
+    L("L-05","Migration des données","I","C","A","C","I","R"), L("L-06","Recette fonctionnelle","I","A","C","I","R","C"),
+    L("L-07","Formation des conseillers","I","A","I","","R","C"), L("L-08","Décision de mise en production","A","R","C","C","C","I"),
+  ];
+  const R = (ID,Risque,Cat,P,I,Plan,Prop,Statut) => ({ID,Risque,"Catégorie":Cat,"Probabilité":P,Impact:I,"Plan de réponse":Plan,"Propriétaire":Prop,Statut});
+  st.data.risques = [
+    R("R-01","Retard de validation de la politique SSO par la RSSI","Sécurité",3,3,"Point dédié RSSI / intégrateur, escalade en COPIL si besoin","P. Morel (RSSI)","Ouvert"),
+    R("R-02","Qualité des données CRM insuffisante pour la migration","Données",3,4,"Lots d'essai dès novembre, nettoyage par le métier","N. Garcia (DSI)","Ouvert"),
+    R("R-03","Disponibilité des key users pendant la recette","Organisation",2,3,"Planifier la recette hors période de clôture","S. Blanc (Métier)","Surveillé"),
+    R("R-04","Complexité des API du SI contrats","Technique",3,2,"POC d'interface en début de sprint 1","K. Haddad (Intégrateur)","Ouvert"),
+    R("R-05","Résistance au changement des conseillers","Humain",2,2,"Réseau d'ambassadeurs par agence","PMO EXEIS","Surveillé"),
+    R("R-06","Dérive du périmètre fonctionnel","Gouvernance",2,3,"Gel du périmètre au jalon de fin de conception","D. Lefèvre (Sponsor)","Ouvert"),
+  ];
+  st.data.decisions = [
+    {ID:"D-01",Date:"29/09/2026","Décision":"Validation de la note de cadrage et du budget de 980 k€",Instance:"COPIL",Porteur:"D. Lefèvre"},
+    {ID:"D-02",Date:"29/09/2026","Décision":"Mise en production unique (big bang) le 01/03/2027",Instance:"COPIL",Porteur:"D. Lefèvre"},
+    {ID:"D-03",Date:"06/10/2026","Décision":"Réaffectation de 15 k€ de la provision vers les interfaces",Instance:"Comité projet",Porteur:"D. Lefèvre"},
+    {ID:"D-04",Date:"13/10/2026","Décision":"Hébergement cloud en région France",Instance:"Comité projet",Porteur:"N. Garcia"},
+  ];
+  st.journal = [
+    {"Date":"13/10/2026","Onglet":"Décisions","ID":"D-04","Champ":"(nouvelle ligne)","Avant":"","Après":"Hébergement cloud en région France","Source":"Comité projet du 13/10/2026","Validé par":"Consultant EXEIS"},
+    {"Date":"13/10/2026","Onglet":"Actions","ID":"A-08","Champ":"(nouvelle ligne)","Avant":"","Après":"Mettre à disposition l'environnement de recette","Source":"Comité projet du 13/10/2026","Validé par":"Consultant EXEIS"},
+    {"Date":"13/10/2026","Onglet":"Actions","ID":"A-05","Champ":"Statut","Avant":"En cours","Après":"Terminé","Source":"Comité projet du 13/10/2026","Validé par":"Consultant EXEIS"},
+  ];
+  const H = (d,a,r,p) => ({"Date":d,"Avancement réel (%)":a,"Réalisé cumulé (k€)":r,"Plan de dépenses cumulé (k€)":p});
+  st.historique = [H("07/09/2026",0,0,0),H("30/09/2026",9,205,210),H("31/10/2026","","",300),H("30/11/2026","","",420),H("31/12/2026","","",540),H("31/01/2027","","",690),H("28/02/2027","","",850),H("31/03/2027","","",980)];
+  return st;
+}
+function blankState(){
+  const st = emptyState();
+  st.fiche = [["Identité","Projet",""],["Identité","Intitulé",""],["Identité","Client",""],["Identité","Direction",""],["Identité","Date de démarrage",""],["Identité","Date de mise en production",""],["Identité","Fin d'hypercare",""],["Identité","Méthode",""],["Identité","Date de situation",""],
+    ["Objectif","1",""],["Inclus","",""],["Exclu","",""],["Équipe","Sponsor",""],["Équipe","Chef de projet",""],["Équipe","PMO","EXEIS Conseil"],["Gouvernance","COPIL",""],["Gouvernance","Comité projet",""]].map(([a,b,c])=>({Rubrique:a,"Libellé":b,Valeur:c}));
+  return st;
+}
+$("btnExample").onclick = () => { if(MODE.addin) return addinCreate(exampleState(), "synthese"); if(!window.XLSX){ toast("La bibliothèque Excel n'est pas chargée : vérifiez la connexion Internet."); return; } S = exampleState(); FILE = {name:"Pilotage_Atlas_exemple.xlsx", handle:null, dirty:true}; startApp(); toast("Fichier d'exemple créé. Cliquez sur Enregistrer pour le sauvegarder sur votre poste."); };
+$("btnBlank").onclick = () => { if(MODE.addin) return addinCreate(blankState(), "aide"); if(!window.XLSX){ toast("La bibliothèque Excel n'est pas chargée : vérifiez la connexion Internet."); return; } S = blankState(); FILE = {name:"Pilotage_Nouveau_projet.xlsx", handle:null, dirty:true}; S.view="aide"; startApp(); toast("Fichier vierge créé. Enregistrez-le, puis remplissez-le dans Excel."); };
+
+// =====================================================================
+//  Calculs projet
+// =====================================================================
+const tasks = () => S.data.planning.filter(t => t.Jalon !== "Oui" && pd(t.Début) && pd(t.Fin));
+const milestones = () => S.data.planning.filter(t => t.Jalon === "Oui" && pd(t.Fin)).sort((a,b)=>pd(a.Fin)-pd(b.Fin));
+const dur = t => Math.max(1, days(pd(t.Début), pd(t.Fin)) + 1);
+function pctAt(t, at, endField="Fin"){ const s=pd(t.Début), e=pd(t[endField])||pd(t.Fin); if(at<s) return 0; if(at>=e) return 100; return 100*(days(s,at)+1)/Math.max(1,days(s,e)+1); }
+function globalPlanned(at){ const T=tasks(); const w=T.reduce((a,t)=>a+dur(t),0); return w ? T.reduce((a,t)=>a+dur(t)*pctAt(t,at,"Fin initiale"),0)/w : 0; }
+function globalActual(){ const T=tasks(); const w=T.reduce((a,t)=>a+dur(t),0); return w ? T.reduce((a,t)=>a+dur(t)*(Number(t.Avancement)||0),0)/w : 0; }
+const isLateTask = t => Number(t.Avancement)<100 && (pd(t.Fin)<REF() || pctAt(t,REF())-Number(t.Avancement)>15);
+const overdue = () => S.data.actions.filter(a => a.Statut!=="Terminé" && pd(a.Échéance) && pd(a.Échéance)<REF());
+const crit = r => (Number(r.Probabilité)||0)*(Number(r.Impact)||0);
+const openRisks = () => S.data.risques.filter(r => r.Statut!=="Clos");
+const critRisks = () => openRisks().filter(r => crit(r)>=9);
+const sum = (rows,c) => rows.reduce((a,r)=>a+(Number(r[c])||0),0);
+const slip = m => { const a=pd(m["Fin initiale"]||m.Fin), b=pd(m.Fin); return a&&b ? days(a,b) : 0; };
+const mepMs = () => { const M=milestones(); return M.find(m=>/mise en production|\bmep\b|go.?live/i.test(m.Tâche)) || M[M.length-1] || null; };
+function kpis(){
+  const ref=REF(), planned=globalPlanned(ref), actual=globalActual(), hasPlan=tasks().length>0;
+  const B=S.data.budget, ini=sum(B,"Budget initial"), prev=sum(B,"Prévision fin"), real=sum(B,"Réalisé"), eng=sum(B,"Engagé");
+  const A=S.data.actions, done=A.filter(a=>a.Statut==="Terminé").length, mep=mepMs();
+  return { hasPlan, planned, actual, spi: hasPlan && planned>=1 ? actual/planned : 1, ini, prev, real, eng, ecart:prev-ini, ecartPct: ini? (prev-ini)/ini*100 : 0,
+    conso: prev? real/prev*100 : 0, overdue:overdue().length, closeRate: A.length? done/A.length*100 : 0, actionsOpen:A.length-done,
+    crit:critRisks().length, openRisks:openRisks().length, mepSlip: mep? slip(mep):0, mep };
+}
+function meteo(k){
+  const reasons=[]; let lvl=0;
+  if(k.hasPlan){ if(k.spi<0.85){lvl=2;reasons.push(`Retard significatif sur le planning (SPI ${k.spi.toFixed(2)})`);} else if(k.spi<0.95){lvl=Math.max(lvl,1);reasons.push(`Avancement inférieur au prévu (SPI ${k.spi.toFixed(2)})`);} }
+  if(k.ecartPct>5){lvl=2;reasons.push(`Dépassement budgétaire prévisionnel de ${k.ecartPct.toFixed(1)} %`);} else if(k.ecartPct>0){lvl=Math.max(lvl,1);reasons.push(`Prévision budgétaire au-dessus du budget initial (+${keur(k.ecart)})`);}
+  if(k.mepSlip>0){lvl=2;reasons.push(`Mise en production décalée de ${k.mepSlip} jours`);}
+  if(k.crit>=3){lvl=2;reasons.push(`${k.crit} risques critiques ouverts`);} else if(k.crit>=1){lvl=Math.max(lvl,1);reasons.push(`${k.crit} risque(s) critique(s) ouvert(s)`);}
+  if(k.overdue>2){lvl=Math.max(lvl,1);reasons.push(`${k.overdue} actions en retard`);}
+  if(!reasons.length) reasons.push("Aucun signal d'alerte");
+  return {name:["vert","orange","rouge"][lvl], label:["Sous contrôle","Vigilance","Critique"][lvl], reasons};
+}
+function projectRange(){
+  const ds = S.data.planning.flatMap(t=>[pd(t.Début),pd(t.Fin),pd(t["Fin initiale"])]).filter(Boolean);
+  const ref = REF();
+  if(!ds.length) return [new Date(ref.getTime()-30*DAY), new Date(ref.getTime()+180*DAY)];
+  return [new Date(Math.min(...ds, ref)-7*DAY), new Date(Math.max(...ds, ref)+14*DAY)];
+}
+
+// =====================================================================
+//  Démarrage de l'application et navigation
+// =====================================================================
+const VIEWS = [
+  ["Pilotage",[["synthese","Synthèse"],["kpi","Indicateurs"]]],
+  ["Onglets du fichier",[["fiche","Fiche projet"],["planning","Planning"],["actions","Actions"],["budget","Budget"],["raci","RACI"],["risques","Risques"],["decisions","Décisions"]]],
+  ["Traçabilité",[["journal","Journal"],["aide","Mode d'emploi"]]],
+];
+function startApp(){
+  $("welcome").hidden=true; $("app").hidden=false; setDirty(FILE.dirty);
+  document.body.classList.toggle("ro", !!MODE.readonly);
+  $("btnClose").hidden = MODE.addin;
+  $("btnBig").hidden = !(MODE.addin && Office.context.requirements.isSetSupported("DialogApi","1.2"));
+  $("fileName").textContent = FILE.name;
+  const isExample = ficheGet("Identité","Projet")==="Atlas";
+  $("btnSampleCR").hidden = !isExample; $("btnSim").hidden = !isExample;
+  render(); window.scrollTo({top:0});
+}
+function renderHeader(){
+  const proj = ficheGet("Identité","Projet") || "Projet sans nom", title = ficheGet("Identité","Intitulé");
+  $("sideProj").textContent = `Projet ${proj}`;
+  $("topTitle").textContent = title ? `${proj} : ${title}` : proj;
+  $("topEyebrow").textContent = [ficheGet("Identité","Client"), ficheGet("Identité","Direction")].filter(Boolean).join(" · ") || "Client non renseigné";
+  $("asof").textContent = `Situation au ${fd(REF())}${pd(ficheGet("Identité","Date de situation"))?"":" (aujourd'hui)"}`;
+  document.title = `Pilotage ${proj}`;
+}
+function renderNav(){
+  const k = kpis();
+  const badges = {actions: k.overdue?`<span class="badge bad" title="Actions en retard">${k.overdue}</span>`:"", risques: k.crit?`<span class="badge bad" title="Risques critiques">${k.crit}</span>`:"", journal:`<span class="badge">${S.journal.length}</span>`};
+  $("nav").innerHTML = VIEWS.map(([sec,items]) => `<div class="nav-sec">${sec}</div>` + items.map(([id,l]) => `<button data-v="${id}" ${S.view===id?'aria-current="page"':""}><span>${l}</span>${badges[id]||""}</button>`).join("")).join("");
+  const m = meteo(k); const p=$("meteoPill"); p.className=`meteo m-${m.name}`; p.lastElementChild.textContent = `Météo : ${m.label}`;
+}
+$("nav").addEventListener("click", e => { const b=e.target.closest("button[data-v]"); if(!b) return; S.view=b.dataset.v; render(); window.scrollTo({top:0}); });
+
+// =====================================================================
+//  Graphiques (SVG dessinés à la main, couleurs issues du thème)
+// =====================================================================
+function lineChart({series, yMax, yTicks, yFmt=v=>v, x0, x1, h=230}){
+  const W=640, H=h, L=46, R=16, T=14, B=26, iw=W-L-R, ih=H-T-B, ref=REF();
+  const X = d => L + (pd(d)-x0)/(x1-x0)*iw, Y = v => T + ih - Math.min(v,yMax)/yMax*ih;
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">`;
+  yTicks.forEach(v => s += `<line class="grid-l" x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${L-6}" y="${Y(v)+4}" text-anchor="end">${yFmt(v)}</text>`);
+  for(let d=new Date(x0.getFullYear(),x0.getMonth()+1,1); d<=x1; d=new Date(d.getFullYear(),d.getMonth()+1,1)){ const x=L+(d-x0)/(x1-x0)*iw; s += `<text class="ax" x="${x}" y="${H-8}" text-anchor="middle">${d.toLocaleDateString("fr-FR",{month:"short"})}</text>`; }
+  if(ref>=x0 && ref<=x1){ const tx=X(fd(ref)); s += `<line class="today" x1="${tx}" x2="${tx}" y1="${T}" y2="${T+ih}"/><text class="ax" x="${tx+4}" y="${T+10}" style="fill:var(--bad)">auj.</text>`; }
+  series.forEach(se => {
+    const pts = se.pts.filter(([d])=>pd(d)).sort((a,b)=>pd(a[0])-pd(b[0])).map(([d,v]) => [X(d),Y(Number(v)||0)]); if(!pts.length) return;
+    const path = pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join("");
+    if(se.area) s += `<path class="s-area" d="${path}L${pts[pts.length-1][0]},${T+ih}L${pts[0][0]},${T+ih}Z"/>`;
+    s += `<path class="${se.cls}" d="${path}"/>`;
+    if(se.end){ const p=pts[pts.length-1]; s += `<circle class="dot" cx="${p[0]}" cy="${p[1]}" r="5"/><text class="lab" x="${Math.min(p[0]+8,W-70)}" y="${p[1]-8}">${esc(se.end)}</text>`; }
+  });
+  return s + `</svg>`;
+}
+const histPts = col => S.historique.filter(h => h[col]!=="" && h[col]!==undefined && pd(h.Date)).map(h=>[h.Date, Number(h[col])]);
+function withCurrent(pts, v){ const ref=fd(REF()); const out = pts.filter(([d])=>pd(d)<REF()); out.push([ref, v]); return out; }
+function progressChart(){
+  const [x0,x1]=projectRange(); const plan=[];
+  for(let d=new Date(x0); d<=x1; d=new Date(d.getTime()+7*DAY)) plan.push([fd(d), globalPlanned(d)]);
+  plan.push([fd(x1), globalPlanned(x1)]);
+  const act = withCurrent(histPts("Avancement réel (%)"), globalActual());
+  return lineChart({x0,x1,yMax:100,yTicks:[0,25,50,75,100],yFmt:v=>v+" %",series:[{pts:plan,cls:"s-plan"},{pts:act,cls:"s-real",area:true,end:Math.round(globalActual())+" %"}]});
+}
+function budgetChart(){
+  const [x0,x1]=projectRange(); const plan=histPts("Plan de dépenses cumulé (k€)");
+  const real=sum(S.data.budget,"Réalisé"); const act=withCurrent(histPts("Réalisé cumulé (k€)"), real);
+  const top = Math.max(sum(S.data.budget,"Prévision fin"), sum(S.data.budget,"Budget initial"), ...plan.map(p=>p[1]), real, 10);
+  const step = Math.pow(10, Math.floor(Math.log10(top))) * (top/Math.pow(10,Math.floor(Math.log10(top)))>5?2:top/Math.pow(10,Math.floor(Math.log10(top)))>2?1:0.5);
+  const yMax = Math.ceil(top*1.08/step)*step; const ticks=[]; for(let v=0; v<=yMax; v+=step) ticks.push(v);
+  return lineChart({x0,x1,yMax,yTicks:ticks,yFmt:v=>Math.round(v),series:[{pts:plan,cls:"s-plan"},{pts:act,cls:"s-real",area:true,end:keur(real)}]});
+}
+function donut(parts, label){
+  const total=parts.reduce((a,p)=>a+p.v,0); let off=0; const r=52, C=2*Math.PI*r;
+  let s = `<svg class="chart" viewBox="0 0 140 140" role="img"><circle cx="70" cy="70" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="18"/>`;
+  parts.forEach(p => { const len=total? p.v/total*C : 0; if(len>0) s += `<circle cx="70" cy="70" r="${r}" fill="none" stroke="${p.c}" stroke-width="18" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`; off+=len; });
+  return s + `<text x="70" y="68" text-anchor="middle" style="fill:var(--ink);font:700 24px var(--f-disp)">${total}</text><text x="70" y="86" text-anchor="middle" class="ax" style="fill:var(--muted);font-size:11px">${label}</text></svg>`;
+}
+const STAT_COLORS = {"À faire":"var(--plan)","En cours":"var(--accent)","Bloqué":"var(--bad)","Terminé":"var(--ok)"};
+
+// =====================================================================
+//  Vues
+// =====================================================================
+const rc = (sheet,id) => S.recentRows.has(`${sheet}|${id}`) ? " recent" : "";
+const statusPill = v => ({"Terminé":"p-ok","En cours":"p-run","Bloqué":"p-bad","En retard":"p-warn","À faire":"p-mut","Planifié":"p-mut","Ouvert":"p-warn","Surveillé":"p-run","Clos":"p-ok"}[v]||"p-mut");
+const ragOf = (good, warn) => good ? ["c-ok","Conforme"] : warn ? ["c-warn","Vigilance"] : ["c-bad","Alerte"];
+function tile(lbl,val,sub,rag){ return `<div class="tile"><span class="lbl">${lbl}</span><span class="val">${val}</span><span class="sub">${sub}</span>${rag?`<span class="rag ${rag[0]}"><i></i>${rag[1]}</span>`:""}</div>`; }
+const nextMs = () => milestones().find(x => Number(x.Avancement)<100 && pd(x.Fin)>=REF());
+const emptyMsg = (what, sheet) => `<div class="panel"><p class="empty">${what} Ajoutez des lignes dans l'onglet « ${sheet} » du fichier Excel, ou intégrez un compte rendu.</p></div>`;
+
+function vSynthese(){
+  const k=kpis(), m=meteo(k), ref=REF();
+  const att=[];
+  overdue().forEach(a => att.push({s:"bad",t:`${a.ID} · ${a.Action}`,d:`Action en retard depuis le ${a.Échéance} · ${a.Responsable}`}));
+  critRisks().forEach(r => att.push({s:"bad",t:`${r.ID} · ${r.Risque}`,d:`Risque critique (criticité ${crit(r)}) · ${r.Propriétaire}`}));
+  tasks().filter(isLateTask).forEach(t => att.push({s:"warn",t:`${t.ID} · ${t.Tâche}`,d:`Avancement ${t.Avancement} % pour ${Math.round(pctAt(t,ref))} % attendu`}));
+  milestones().filter(x=>slip(x)>0).forEach(x => att.push({s:"warn",t:`${x.ID} · ${x.Tâche}`,d:`Jalon décalé de ${slip(x)} jours (initialement le ${x["Fin initiale"]})`}));
+  const decs=[...S.data.decisions].sort((a,b)=>(pd(b.Date)||0)-(pd(a.Date)||0)).slice(0,3);
+  const nm = nextMs();
+  const warnings = S.warnings.length ? `<div class="warnbox"><b>Contrôle du fichier : ${S.warnings.length} remarque(s)</b><ul>${S.warnings.slice(0,8).map(w=>`<li>${esc(w)}</li>`).join("")}${S.warnings.length>8?`<li>… et ${S.warnings.length-8} autre(s)</li>`:""}</ul><span style="font-size:12px;color:var(--muted)">Corrigez ces points dans Excel si besoin. L'outil fonctionne quand même.</span></div>` : "";
+  return `${warnings}<div class="vh"><div><h2>Synthèse</h2><p>Vue d'ensemble pour le sponsor et le COPIL. Tous les éléments sont calculés à partir des onglets du fichier.</p></div></div>
+  <div class="grid g-wide">
+    <div class="panel"><div class="meteo-card"><div class="sun ${m.name}">${m.name}</div><div><h3 style="font-size:17px">Météo projet : ${m.label}</h3><ul class="reasons">${m.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></div></div></div>
+    <div class="panel"><div class="panel-h"><h3>Dernier CR intégré</h3></div><p style="margin:0;font-size:13px">${S.journal.length?esc(S.journal[0].Source):"Aucun pour l'instant"}</p><p style="margin:0;font-size:12px;color:var(--muted)">${S.journal.length} modification(s) tracée(s) dans le journal.</p>${LAST_RUN?`<p style="margin:0;font-size:13px"><b>${LAST_RUN.n} modification(s)</b>${LAST_RUN.total!==null?` en <b>${Math.floor(LAST_RUN.total/60)} min ${pad(LAST_RUN.total%60)} s</b>, du CR au fichier, validation comprise`:""}${LAST_RUN.cost!==null?` · coût IA estimé ${LAST_RUN.cost.toFixed(2).replace(".",",")} $`:""}</p>`:""}<div class="row"><button class="btn sm" data-go="journal">Voir le journal</button><button class="btn sm primary ro-hide" data-cr="1">Intégrer un CR</button></div></div>
+  </div>
+  <div class="grid g4">
+    ${tile("Avancement réel", k.hasPlan?`${Math.round(k.actual)}<small> %</small>`:"—", k.hasPlan?`${Math.round(k.planned)} % prévu à date`:"Planning non renseigné", k.hasPlan?ragOf(k.spi>=0.95,k.spi>=0.85):null)}
+    ${tile("Prévision budgétaire", k.ini?`${Math.round(k.prev)}<small> k€</small>`:"—", k.ini?`${k.ecart>0?"+":""}${keur(k.ecart)} vs budget initial`:"Budget non renseigné", k.ini?ragOf(k.ecartPct<=0,k.ecartPct<=5):null)}
+    ${tile("Prochain jalon", nm?`<span style="font-size:19px">${esc(nm.Tâche)}</span>`:"—", nm?`${nm.Fin} · dans ${days(ref,pd(nm.Fin))} jours`:"Aucun jalon à venir", nm?(slip(nm)>0?["c-warn",`Décalé de ${slip(nm)} j`]:["c-ok","À l'heure"]):null)}
+    ${tile("Mise en production", k.mep?`<span style="font-size:19px">${k.mep.Fin}</span>`:"—", k.mep?`Date initiale : ${k.mep["Fin initiale"]}`:"Jalon non renseigné", k.mep?ragOf(k.mepSlip<=0,false):null)}
+  </div>
+  <div class="grid g-wide">
+    <div class="panel"><div class="panel-h"><h3>Points d'attention</h3><small>${att.length} signal(s)</small></div>${att.length?`<ul class="att">${att.map(a=>`<li><span class="sev ${a.s}"></span><div><b>${esc(a.t)}</b><small>${esc(a.d)}</small></div></li>`).join("")}</ul>`:`<p class="empty">Aucun point d'attention.</p>`}</div>
+    <div class="panel"><div class="panel-h"><h3>Jalons</h3><small>Orange = décalé</small></div>${milestones().length?`<div>${milestones().map(x=>{const sl=slip(x), done=Number(x.Avancement)>=100;return `<div class="ms-row${rc("planning",x.ID)}"><span class="dia ${done?"done":sl>0?"slip":""}"></span><span>${esc(x.Tâche)}</span><span class="num" style="font-size:12.5px">${x.Fin}${sl>0?` <span class="pill p-warn">+${sl} j</span>`:""}</span></div>`}).join("")}</div>`:`<p class="empty">Aucun jalon (ligne du Planning avec « Jalon » = Oui).</p>`}</div>
+  </div>
+  <div class="panel"><div class="panel-h"><h3>Dernières décisions</h3><button class="btn sm" data-go="decisions">Toutes les décisions</button></div>${decs.length?`<div class="tw"><table class="t"><tbody>${decs.map(d=>`<tr class="${rc("decisions",d.ID).trim()}"><td class="idc">${esc(d.ID)}</td><td class="num" style="white-space:nowrap">${esc(d.Date)}</td><td>${esc(d.Décision)}</td><td><span class="pill p-mut">${esc(d.Instance)}</span></td></tr>`).join("")}</tbody></table></div>`:`<p class="empty">Aucune décision enregistrée.</p>`}</div>`;
+}
+
+function vKpi(){
+  const k=kpis();
+  const counts = Object.keys(STAT_COLORS).map(s=>({s, v:S.data.actions.filter(a=>a.Statut===s).length, c:STAT_COLORS[s]}));
+  const rows = [
+    ["Indice de performance planning (SPI)", k.hasPlan?k.spi.toFixed(2):"—", "≥ 0,95", k.hasPlan?ragOf(k.spi>=0.95,k.spi>=0.85):["c-mut","n/a"], "Avancement réel ÷ avancement prévu à date (dates initiales)"],
+    ["Avancement global", k.hasPlan?`${Math.round(k.actual)} %`:"—", k.hasPlan?`${Math.round(k.planned)} % prévu`:"—", k.hasPlan?ragOf(k.actual>=k.planned-3,k.actual>=k.planned-8):["c-mut","n/a"], "Moyenne des tâches pondérée par leur durée"],
+    ["Écart budgétaire prévisionnel", `${k.ecartPct>0?"+":""}${k.ecartPct.toFixed(1)} %`, "≤ 0 %", ragOf(k.ecartPct<=0,k.ecartPct<=5), "(Prévision fin − budget initial) ÷ budget initial"],
+    ["Consommation budgétaire", `${Math.round(k.conso)} %`, "Suivi", ["c-mut","Information"], "Réalisé ÷ prévision fin"],
+    ["Actions en retard", k.overdue, "≤ 2", ragOf(k.overdue===0,k.overdue<=2), "Échéance dépassée et statut différent de Terminé"],
+    ["Taux de clôture des actions", `${Math.round(k.closeRate)} %`, "Suivi", ["c-mut","Information"], "Actions terminées ÷ actions créées"],
+    ["Risques critiques ouverts", k.crit, "0", ragOf(k.crit===0,k.crit<=2), "Probabilité × impact ≥ 9"],
+    ["Glissement de la mise en production", k.mep?`${k.mepSlip} j`:"—", "0 j", k.mep?ragOf(k.mepSlip<=0,false):["c-mut","n/a"], "Date prévue − date initiale du jalon"],
+  ];
+  return `<div class="vh"><div><h2>Indicateurs</h2><p>KPI calculés automatiquement à partir des onglets Planning, Budget, Actions et Risques. Les courbes s'appuient aussi sur l'onglet « Historique », complété à chaque intégration de CR.</p></div></div>
+  <div class="grid g4">
+    ${tile("SPI", k.hasPlan?k.spi.toFixed(2):"—", "Objectif ≥ 0,95", k.hasPlan?ragOf(k.spi>=0.95,k.spi>=0.85):null)}
+    ${tile("Écart budgétaire", `${k.ecartPct>0?"+":""}${k.ecartPct.toFixed(1)}<small> %</small>`, `${keur(k.prev)} prévus pour ${keur(k.ini)}`, ragOf(k.ecartPct<=0,k.ecartPct<=5))}
+    ${tile("Actions en retard", k.overdue, `${k.actionsOpen} action(s) ouverte(s)`, ragOf(k.overdue===0,k.overdue<=2))}
+    ${tile("Risques critiques", k.crit, `${k.openRisks} risque(s) ouvert(s)`, ragOf(k.crit===0,k.crit<=2))}
+  </div>
+  <div class="grid g2">
+    <div class="panel"><div class="panel-h"><h3>Courbe d'avancement</h3><small>Prévu (dates initiales) vs réel</small></div>${k.hasPlan?progressChart():`<p class="empty">Renseignez le planning pour afficher la courbe.</p>`}<div class="legend"><span><i class="lg" style="background:var(--plan)"></i>Prévu</span><span><i class="lg" style="background:var(--accent)"></i>Réel</span></div></div>
+    <div class="panel"><div class="panel-h"><h3>Consommation budgétaire cumulée</h3><small>En k€</small></div>${budgetChart()}<div class="legend"><span><i class="lg" style="background:var(--plan)"></i>Plan de dépenses (onglet Historique)</span><span><i class="lg" style="background:var(--accent)"></i>Réalisé</span></div></div>
+  </div>
+  <div class="grid g-wide">
+    <div class="panel"><div class="panel-h"><h3>Tableau des indicateurs</h3></div><div class="tw"><table class="t"><thead><tr><th>Indicateur</th><th class="r">Valeur</th><th>Cible</th><th>Statut</th><th>Mode de calcul</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${r[0]}</b></td><td class="r num">${r[1]}</td><td class="num" style="white-space:nowrap">${r[2]}</td><td><span class="rag ${r[3][0]}"><i></i>${r[3][1]}</span></td><td style="color:var(--muted);font-size:12.5px">${r[4]}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="panel"><div class="panel-h"><h3>Actions par statut</h3></div><div class="donut-wrap">${donut(counts,"actions")}<div class="donut-leg">${counts.map(c=>`<div><span><i class="sw" style="background:${c.c}"></i>${c.s}</span><b class="num">${c.v}</b></div>`).join("")}</div></div></div>
+  </div>`;
+}
+
+function vFiche(){
+  const k=kpis(); const ident = ficheList("Identité").filter(f=>squash(f.Libellé)!=="date de situation");
+  const list = r => { const l=ficheList(r).filter(f=>f.Valeur); return l.length?`<ul class="ul">${l.map(f=>`<li>${esc(f.Valeur)}</li>`).join("")}</ul>`:`<p class="empty">Non renseigné.</p>`; };
+  const kv = r => { const l=ficheList(r).filter(f=>f.Valeur||f.Libellé); return l.length?`<dl class="kv">${l.map(f=>`<dt>${esc(f.Libellé)}</dt><dd>${esc(f.Valeur)||'<span class="c-mut">—</span>'}</dd>`).join("")}</dl>`:`<p class="empty">Non renseigné.</p>`; };
+  return `<div class="vh"><div><h2>Fiche projet</h2><p>Carte d'identité du projet (onglet « Fiche projet »). Elle se modifie dans Excel, l'IA n'y touche pas. Laissez « Date de situation » vide pour calculer les indicateurs à la date du jour.</p></div></div>
+  <div class="grid g2">
+    <div class="panel"><h3>Identité</h3>${ident.length?`<dl class="kv">${ident.map(f=>`<dt>${esc(f.Libellé)}</dt><dd>${esc(f.Valeur)||'<span class="c-mut">—</span>'}</dd>`).join("")}<dt>Budget initial</dt><dd>${keur(k.ini)}</dd></dl>`:`<p class="empty">Non renseigné.</p>`}</div>
+    <div class="panel"><h3>Objectifs</h3>${list("Objectif")}</div>
+    <div class="panel"><h3>Périmètre</h3><div class="grid g2" style="gap:12px"><div><b style="font-size:12px;color:var(--ok)">INCLUS</b>${list("Inclus")}</div><div><b style="font-size:12px;color:var(--bad)">EXCLU</b>${list("Exclu")}</div></div></div>
+    <div class="panel"><h3>Équipe</h3>${kv("Équipe")}</div>
+  </div>
+  <div class="panel"><h3>Gouvernance</h3>${kv("Gouvernance")}</div>`;
+}
+
+function vPlanning(){
+  if(!S.data.planning.length) return `<div class="vh"><div><h2>Planning</h2></div></div>` + emptyMsg("Le planning est vide.","Planning");
+  const [x0,x1]=projectRange(), span=days(x0,x1), PX=Math.max(3, Math.min(8, 950/span)), W=Math.round(span*PX);
+  const X = d => Math.round(days(x0,pd(d))*PX);
+  let head = `<div class="g-row g-head"><div class="g-lab">Tâche</div><div class="g-track" style="width:${W}px">`, grid="";
+  for(let d=new Date(x0.getFullYear(),x0.getMonth()+1,1); d<x1; d=new Date(d.getFullYear(),d.getMonth()+1,1)){ const x=Math.round(days(x0,d)*PX); head += `<span class="g-month" style="left:${x}px">${d.toLocaleDateString("fr-FR",{month:"short",year:"2-digit"})}</span>`; grid += `<span class="g-grid" style="left:${x}px"></span>`; }
+  head += `</div></div>`;
+  const today = `<span class="g-today" style="left:${X(fd(REF()))}px"></span>`;
+  const valid = S.data.planning.filter(t=>pd(t.Début)&&pd(t.Fin));
+  const phases = [...new Set(valid.map(t=>t.Phase||"Sans phase"))];
+  let rows = "";
+  phases.forEach(ph => {
+    const items = valid.filter(t=>(t.Phase||"Sans phase")===ph);
+    const s=new Date(Math.min(...items.map(t=>pd(t.Début)))), e=new Date(Math.max(...items.map(t=>pd(t.Fin))));
+    rows += `<div class="g-row g-phase"><div class="g-lab">${esc(ph)}</div><div class="g-track" style="width:${W}px">${grid}<span style="position:absolute;top:12px;height:4px;border-radius:2px;background:var(--muted);opacity:.5;left:${X(fd(s))}px;width:${Math.max(4,X(fd(e))-X(fd(s)))}px"></span>${today}</div></div>`;
+    items.forEach(t => {
+      let bar; const sl=slip(t);
+      if(t.Jalon==="Oui"){
+        const done=Number(t.Avancement)>=100;
+        bar = (sl>0?`<span class="g-base" style="left:${X(t["Fin initiale"])}px" title="Date initiale ${esc(t["Fin initiale"])}"></span>`:"") + `<span class="g-ms ${done?"done":sl>0?"slip":""}" style="left:${X(t.Fin)}px" title="${esc(t.Tâche)} · ${esc(t.Fin)}"></span><span class="g-pct" style="left:${X(t.Fin)+12}px">${shortD(pd(t.Fin))}${sl>0?` (+${sl} j)`:""}</span>`;
+      } else {
+        const l=X(t.Début), w=Math.max(6, X(t.Fin)-l+PX), av=Number(t.Avancement)||0, cls=av>=100?"done":isLateTask(t)?"late":"";
+        bar = `<span class="g-bar ${cls}" style="left:${l}px;width:${w}px" title="${esc(t.Tâche)} · ${esc(t.Début)} → ${esc(t.Fin)} · ${av} %"><i style="width:${Math.min(100,av)}%"></i></span><span class="g-pct" style="left:${l+w+6}px">${av} %</span>` + (sl!==0&&pd(t["Fin initiale"])?`<span class="g-base" style="left:${X(t["Fin initiale"])}px;transform:translateX(-7px) rotate(45deg) scale(.7)" title="Fin initiale ${esc(t["Fin initiale"])}"></span>`:"");
+      }
+      rows += `<div class="g-row${rc("planning",t.ID)}"><div class="g-lab"><span class="idc">${esc(t.ID)}</span><span class="nm" title="${esc(t.Tâche)}">${esc(t.Tâche)}</span></div><div class="g-track" style="width:${W}px">${grid}${bar}${today}</div></div>`;
+    });
+  });
+  return `<div class="vh"><div><h2>Planning</h2><p>Gantt généré depuis l'onglet « Planning ». Le trait rouge indique la date de situation, les losanges pointillés les dates initiales des éléments décalés.</p></div>
+    <div class="legend"><span><i class="lg" style="background:var(--accent);height:8px"></i>En cours</span><span><i class="lg" style="background:var(--warn);height:8px"></i>En retard</span><span><i class="lg" style="background:var(--ok);height:8px"></i>Terminé</span></div></div>
+  <div class="gantt"><div class="g-inner">${head}${rows}</div></div>
+  <div class="panel"><div class="panel-h"><h3>Détail</h3><small>${tasks().length} tâches · ${milestones().length} jalons</small></div><div class="tw"><table class="t"><thead><tr><th>ID</th><th>Tâche</th><th>Phase</th><th>Début</th><th>Fin</th><th>Fin initiale</th><th class="r">Avanc.</th><th>Responsable</th><th>Statut</th></tr></thead><tbody>${S.data.planning.map(t=>`<tr class="${rc("planning",t.ID).trim()}"><td class="idc">${esc(t.ID)}</td><td>${t.Jalon==="Oui"?"◆ ":""}${esc(t.Tâche)}</td><td>${esc(t.Phase)}</td><td class="num">${esc(t.Début)}</td><td class="num">${esc(t.Fin)}</td><td class="num c-mut">${esc(t["Fin initiale"])}</td><td class="r num">${esc(t.Avancement)} %</td><td>${esc(t.Responsable)}</td><td><span class="pill ${statusPill(t.Statut)}">${esc(t.Statut)}</span></td></tr>`).join("")}</tbody></table></div></div>`;
+}
+
+function vActions(){
+  if(!S.data.actions.length) return `<div class="vh"><div><h2>Actions</h2></div></div>` + emptyMsg("Aucune action.","Actions");
+  const resps = ["Tous",...new Set(S.data.actions.map(a=>a.Responsable).filter(Boolean))];
+  if(!resps.includes(S.resp)) S.resp="Tous";
+  const list = S.data.actions.filter(a => S.resp==="Tous" || a.Responsable===S.resp);
+  const cols = ["À faire","En cours","Bloqué","Terminé"], prioC = {"Haute":"var(--bad)","Moyenne":"var(--warn)","Basse":"var(--plan)"};
+  const other = list.filter(a=>!cols.includes(a.Statut));
+  return `<div class="vh"><div><h2>Actions</h2><p>Plan d'actions du projet (onglet « Actions »). Les échéances dépassées apparaissent en rouge.</p></div>
+    <div class="filters"><label for="fResp" style="font-size:12.5px;color:var(--muted)">Responsable</label><select id="fResp">${resps.map(r=>`<option ${r===S.resp?"selected":""}>${esc(r)}</option>`).join("")}</select></div></div>
+  <div class="kanban">${cols.map(c => { const items=list.filter(a=>a.Statut===c || (c==="À faire" && other.includes(a))); return `<div class="kcol"><div><div class="kcol-h"><span>${c}</span><span class="n">${items.length}</span></div><span style="display:block;height:3px;border-radius:2px;margin-top:6px;background:${STAT_COLORS[c]}"></span></div>
+    ${items.length?items.map(a => { const late = a.Statut!=="Terminé" && pd(a.Échéance) && pd(a.Échéance)<REF(); return `<div class="kcard${rc("actions",a.ID)}"><div class="top-line"><span class="idc">${esc(a.ID)}</span>${S.recentRows.has("actions|"+a.ID)?'<span class="tag-new">Mis à jour</span>':`<span class="prio"><i style="background:${prioC[a.Priorité]||"var(--plan)"}"></i>${esc(a.Priorité)}</span>`}</div><div class="ti">${esc(a.Action)}</div><div class="meta"><span>${esc(a.Responsable)}</span><span class="num ${late?"late-txt":""}">${late?"En retard · ":""}${esc(a.Échéance)}</span></div>${a.Source?`<div class="meta"><span>${esc(a.Source)}</span></div>`:""}</div>`; }).join(""):`<div class="kempty">Aucune action</div>`}</div>`; }).join("")}</div>`;
+}
+
+function vBudget(){
+  const B=S.data.budget, k=kpis();
+  if(!B.length) return `<div class="vh"><div><h2>Budget</h2></div></div>` + emptyMsg("Le budget est vide.","Budget");
+  const max=Math.max(1,...B.map(b=>Math.max(Number(b["Budget initial"])||0,Number(b["Prévision fin"])||0,Number(b.Engagé)||0)));
+  const pc = v => ((Number(v)||0)/max*100).toFixed(2)+"%";
+  return `<div class="vh"><div><h2>Budget</h2><p>Suivi budgétaire en k€ (onglet « Budget »). L'écart compare la prévision de fin au budget initial.</p></div></div>
+  <div class="grid g4">
+    ${tile("Budget initial",`${Math.round(k.ini)}<small> k€</small>`,"Référence validée")}
+    ${tile("Engagé",`${Math.round(k.eng)}<small> k€</small>`,`${k.ini?Math.round(k.eng/k.ini*100):0} % du budget initial`)}
+    ${tile("Réalisé",`${Math.round(k.real)}<small> k€</small>`,`${Math.round(k.conso)} % de la prévision`)}
+    ${tile("Prévision fin",`${Math.round(k.prev)}<small> k€</small>`,`${k.ecart>0?"+":""}${keur(k.ecart)} vs initial`, ragOf(k.ecart<=0,k.ecartPct<=5))}
+  </div>
+  <div class="panel"><div class="panel-h"><h3>Par poste</h3><div class="legend"><span><i class="lg" style="background:var(--accent);height:10px"></i>Réalisé</span><span><i class="lg" style="background:repeating-linear-gradient(135deg,var(--accent-2) 0 3px,transparent 3px 5px);height:10px;border:1px solid var(--line)"></i>Engagé</span><span><i class="lg" style="background:var(--ink);width:2px;height:12px"></i>Prévision fin</span><span><i class="lg" style="background:var(--bad);width:2px;height:12px"></i>Prévision au-dessus de l'initial</span></div></div>
+    <div class="bbars">${B.map(b => { const ini=Number(b["Budget initial"])||0, pr=Number(b["Prévision fin"])||0, over=pr>ini; return `<div class="bb${rc("budget",b.ID)}"><div class="nm"><b>${esc(b.Poste)}</b><small>${esc(b.ID)} · ${esc(b.Catégorie)}</small></div><div class="bb-track" title="Initial ${ini} · Engagé ${b.Engagé} · Réalisé ${b.Réalisé} · Prévision ${pr}"><span class="bb-eng" style="width:${pc(b.Engagé)}"></span><span class="bb-real" style="width:${pc(b.Réalisé)}"></span><span class="bb-mk ${over?"over":""}" style="left:${pc(pr)}"></span></div><div class="v">${pr} k€${over?`<br><span class="c-bad" style="font-size:11.5px">+${pr-ini}</span>`:pr<ini?`<br><span class="c-ok" style="font-size:11.5px">${pr-ini}</span>`:""}</div></div>`; }).join("")}</div></div>
+  <div class="panel"><div class="tw"><table class="t"><thead><tr><th>ID</th><th>Poste</th><th class="r">Initial</th><th class="r">Engagé</th><th class="r">Réalisé</th><th class="r">Prévision</th><th class="r">Écart</th><th>Commentaire</th></tr></thead><tbody>
+    ${B.map(b=>{const e=(Number(b["Prévision fin"])||0)-(Number(b["Budget initial"])||0);return `<tr class="${rc("budget",b.ID).trim()}"><td class="idc">${esc(b.ID)}</td><td>${esc(b.Poste)}</td><td class="r num">${esc(b["Budget initial"])}</td><td class="r num">${esc(b.Engagé)}</td><td class="r num">${esc(b.Réalisé)}</td><td class="r num">${esc(b["Prévision fin"])}</td><td class="r num ${e>0?"c-bad":e<0?"c-ok":""}">${e>0?"+":""}${e}</td><td style="font-size:12.5px;color:var(--muted)">${esc(b.Commentaire)}</td></tr>`}).join("")}
+    <tr class="tot"><td></td><td>Total</td><td class="r num">${k.ini}</td><td class="r num">${k.eng}</td><td class="r num">${k.real}</td><td class="r num">${k.prev}</td><td class="r num ${k.ecart>0?"c-bad":""}">${k.ecart>0?"+":""}${k.ecart}</td><td></td></tr></tbody></table></div></div>`;
+}
+
+function raciCheck(r){ const v=S.actors.map(a=>r[a]); const A=v.filter(x=>x==="A"||x==="A/R").length, R=v.filter(x=>x==="R"||x==="A/R").length; const pb=[]; if(A!==1) pb.push(A===0?"Aucun A":`${A} A`); if(R<1) pb.push("Aucun R"); return pb; }
+function vRaci(){
+  const L = v => v ? `<span class="rl rl-${String(v).replace("/","")}">${esc(v)}</span>` : `<span class="c-mut">·</span>`;
+  const head = `<div class="vh"><div><h2>Matrice RACI</h2><p>Qui fait quoi sur chaque livrable (onglet « RACI »). Les acteurs sont les colonnes de l'onglet. Le contrôle vérifie qu'il y a exactement un A et au moins un R par ligne.</p></div>
+    <div class="legend"><span>${L("R")} Réalise</span><span>${L("A")} Approuve</span><span>${L("A/R")} Approuve et réalise</span><span>${L("C")} Consulté</span><span>${L("I")} Informé</span></div></div>`;
+  if(!S.data.raci.length) return head + emptyMsg("La matrice est vide.","RACI");
+  return head + `<div class="panel"><div class="tw"><table class="t raci"><thead><tr><th>ID</th><th>Livrable</th>${S.actors.map(a=>`<th style="text-align:center">${esc(a)}</th>`).join("")}<th>Contrôle</th></tr></thead><tbody>
+  ${S.data.raci.map(r=>{const pb=raciCheck(r);return `<tr><td class="idc">${esc(r.ID)}</td><td><b>${esc(r.Livrable)}</b></td>${S.actors.map(a=>`<td class="rc ${S.recentCells.has(`raci|${r.ID}|${a}`)?"chg":""}">${L(r[a])}</td>`).join("")}<td>${pb.length?`<span class="pill p-bad">${pb.join(", ")}</span>`:`<span class="pill p-ok">OK</span>`}</td></tr>`}).join("")}
+  </tbody></table></div></div>`;
+}
+
+function vRisques(){
+  if(!S.data.risques.length) return `<div class="vh"><div><h2>Risques</h2></div></div>` + emptyMsg("Le registre des risques est vide.","Risques");
+  const open=openRisks(), lvl = c => c>=12?4:c>=9?3:c>=4?2:1;
+  let heat="";
+  for(let imp=4; imp>=1; imp--){ heat += `<div class="hax">${imp}</div>`; for(let p=1;p<=4;p++){ const here=open.filter(r=>Number(r.Probabilité)===p&&Number(r.Impact)===imp); heat += `<div class="hc h${lvl(p*imp)}">${here.map(r=>`<span class="rchip${rc("risques",r.ID)}" title="${esc(r.Risque)}">${esc(r.ID)}</span>`).join("")}</div>`; } }
+  heat += `<div></div>${[1,2,3,4].map(p=>`<div class="hax">${p}</div>`).join("")}`;
+  const critCls = c => c>=9?"p-bad":c>=4?"p-warn":"p-ok";
+  const sorted=[...S.data.risques].sort((a,b)=>crit(b)-crit(a));
+  return `<div class="vh"><div><h2>Risques</h2><p>Registre des risques (onglet « Risques »). Criticité = probabilité × impact, échelle de 1 à 4. Critique à partir de 9.</p></div></div>
+  <div class="grid g-wide" style="grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)">
+    <div class="panel"><div class="panel-h"><h3>Cartographie</h3><small>${open.length} risque(s) ouvert(s)</small></div>
+      <div style="display:flex;gap:8px"><div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;color:var(--muted);text-align:center">Impact</div><div style="flex:1;min-width:0"><div class="heat">${heat}</div><div style="text-align:center;font-size:11px;color:var(--muted);margin-top:4px">Probabilité</div></div></div></div>
+    <div class="panel"><div class="panel-h"><h3>Registre</h3></div><div class="tw"><table class="t"><thead><tr><th>ID</th><th>Risque</th><th class="r">P</th><th class="r">I</th><th>Criticité</th><th>Statut</th></tr></thead><tbody>
+      ${sorted.map(r=>`<tr class="${rc("risques",r.ID).trim()}"><td class="idc">${esc(r.ID)}</td><td><b>${esc(r.Risque)}</b><div style="font-size:12px;color:var(--muted)">${esc(r.Catégorie)} · ${esc(r.Propriétaire)}</div>${r["Plan de réponse"]?`<div style="font-size:12px;margin-top:2px">↳ ${esc(r["Plan de réponse"])}</div>`:""}</td><td class="r num">${esc(r.Probabilité)}</td><td class="r num">${esc(r.Impact)}</td><td><span class="pill ${critCls(crit(r))}">${crit(r)}</span></td><td><span class="pill ${statusPill(r.Statut)}">${esc(r.Statut)}</span></td></tr>`).join("")}
+    </tbody></table></div></div>
+  </div>`;
+}
+
+function vDecisions(){
+  const D=[...S.data.decisions].sort((a,b)=>(pd(b.Date)||0)-(pd(a.Date)||0));
+  const head = `<div class="vh"><div><h2>Décisions</h2><p>Registre des décisions (onglet « Décisions »), de la plus récente à la plus ancienne.</p></div></div>`;
+  if(!D.length) return head + emptyMsg("Aucune décision enregistrée.","Décisions");
+  return head + `<div class="tl">${D.map(d=>`<div class="tl-item"><div class="tl-date">${esc(d.Date)}</div><div class="tl-dot"><i></i></div><div class="tl-body${rc("decisions",d.ID)}"><b>${esc(d.Décision)}</b><div class="meta"><span class="idc">${esc(d.ID)}</span>${d.Instance?`<span class="pill p-mut">${esc(d.Instance)}</span>`:""}${d.Porteur?`<span>Porteur : ${esc(d.Porteur)}</span>`:""}${S.recentRows.has("decisions|"+d.ID)?'<span class="tag-new">Nouveau</span>':""}</div></div></div>`).join("")}</div>`;
+}
+
+function vJournal(){
+  const head = `<div class="vh"><div><h2>Journal des modifications</h2><p>Chaque modification validée à partir d'un CR est tracée ici et dans l'onglet « Journal » du fichier : quoi, quand, d'après quelle réunion, validé par qui.</p></div></div>`;
+  if(!S.journal.length) return head + `<div class="panel"><p class="empty">Aucune modification tracée pour l'instant.</p></div>`;
+  return head + `<div class="panel"><div class="tw"><table class="t"><thead><tr><th>Date</th><th>Onglet</th><th>ID</th><th>Champ</th><th>Avant</th><th>Après</th><th>Source</th><th>Validé par</th></tr></thead><tbody>
+  ${S.journal.map(j=>`<tr><td class="num">${esc(j.Date)}</td><td>${esc(j.Onglet)}</td><td class="idc">${esc(j.ID)}</td><td>${esc(j.Champ)}</td><td class="c-mut">${esc(j.Avant)}</td><td><b>${esc(j.Après)}</b></td><td style="font-size:12.5px">${esc(j.Source)}</td><td style="font-size:12.5px">${esc(j["Validé par"])}</td></tr>`).join("")}
+  </tbody></table></div></div>`;
+}
+
+function vAide(){
+  return `<div class="vh"><div><h2>Mode d'emploi</h2><p>Les règles à connaître pour utiliser l'outil au quotidien.</p></div></div>
+  <div class="help">
+    <div class="panel"><h3>Après une réunion : intégrer le compte rendu</h3><ol>
+      <li>Ouvrez cette page, puis le fichier Excel du projet (bouton ou glisser-déposer).</li>
+      <li>Cliquez sur <b>Intégrer un CR</b>, collez le texte du compte rendu et vérifiez la date de réunion.</li>
+      <li><b>Mode API Claude</b> : saisissez la clé, cliquez sur <b>Analyser avec Claude</b>, puis passez directement à la vérification des propositions.</li>
+      <li><b>Mode copier-coller</b> : cliquez sur <b>Préparer le prompt</b>, puis <b>Copier le prompt</b>.</li>
+      <li>Dans Playground, collez le prompt et lancez-le. Copiez <b>toute</b> la réponse de l'IA.</li>
+      <li>Revenez ici, collez la réponse à l'étape 3, puis cliquez sur <b>Lire les propositions</b>.</li>
+      <li>Vérifiez chaque proposition. Décochez ce qui est faux, corrigez une valeur si besoin. Les propositions dont la citation est introuvable dans le CR sont décochées d'office.</li>
+      <li>Cliquez sur <b>Appliquer</b>, puis sur <b>Enregistrer</b> (ou Ctrl+S).</li>
+    </ol></div>
+    <div class="panel"><h3>Enregistrement du fichier</h3><ul>
+      <li>Avec Chrome ou Edge, l'outil écrit directement dans le fichier ouvert. La première fois, le navigateur demande l'autorisation de modifier le fichier : acceptez.</li>
+      <li><b>Fermez le fichier dans Excel avant d'enregistrer</b> depuis l'outil, sinon Windows bloque l'écriture.</li>
+      <li>Si le navigateur ne permet pas l'écriture directe, l'outil télécharge une copie : remplacez l'ancien fichier par celle-ci.</li>
+      <li>Une seule version fait foi : partez toujours du dernier fichier déposé dans le dossier du projet.</li>
+    </ul></div>
+    <div class="panel"><h3>Règles pour modifier le fichier dans Excel</h3><ul>
+      <li>Ne renommez pas les onglets ni les titres de colonnes (ligne 1). Vous pouvez ajouter des colonnes : l'outil les ignore… mais elles ne seront pas conservées à l'enregistrement.</li>
+      <li>Chaque ligne a un identifiant unique (<code>A-01</code>, <code>T-03</code>, <code>J-02</code>, <code>B-04</code>, <code>R-05</code>, <code>D-06</code>, <code>L-07</code>). Une ligne sans identifiant en reçoit un automatiquement.</li>
+      <li>Planning : un jalon a « Jalon » = <code>Oui</code> et la même date de début et de fin. « Fin initiale » est la date de référence : ne la modifiez qu'en cas de re-planification validée.</li>
+      <li>Statuts autorisés. Actions : À faire, En cours, Bloqué, Terminé. Planning : Planifié, En cours, Terminé, En retard. Risques : Ouvert, Surveillé, Clos.</li>
+      <li>RACI : les colonnes après « Livrable » sont les acteurs. Ajoutez ou renommez des acteurs librement. Valeurs : R, A, C, I ou A/R.</li>
+      <li>Risques : probabilité et impact de 1 à 4.</li>
+      <li>Fiche projet : « Date de situation » fige la date de calcul des indicateurs. Laissez-la vide pour utiliser la date du jour.</li>
+      <li>Historique : la colonne « Plan de dépenses cumulé » sert de référence à la courbe budgétaire. Les deux autres colonnes se remplissent à chaque intégration de CR.</li>
+    </ul></div>
+    <div class="panel"><h3>Confidentialité</h3><ul>
+      <li>Le fichier reste sur votre poste : l'outil ne l'envoie nulle part.</li>
+      <li>Seul le prompt part vers l'IA : en mode API, il est envoyé directement à Anthropic depuis ce navigateur ; en copier-coller, c'est vous qui le transmettez. Il contient le CR et le contenu des onglets. N'utilisez l'IA que si le contrat client le permet.</li>
+      <li>La clé API n'est jamais écrite dans le fichier Excel. Si vous cochez la mémorisation, elle reste dans ce navigateur : à réserver à un poste personnel.</li>
+    </ul></div>
+  </div>`;
+}
+
+const RENDER = {synthese:vSynthese,kpi:vKpi,fiche:vFiche,planning:vPlanning,actions:vActions,budget:vBudget,raci:vRaci,risques:vRisques,decisions:vDecisions,journal:vJournal,aide:vAide};
+function render(){ renderHeader(); renderNav(); $("view").innerHTML = RENDER[S.view](); }
+$("view").addEventListener("click", e => { const g=e.target.closest("[data-go]"); if(g){ S.view=g.dataset.go; render(); window.scrollTo({top:0}); } if(e.target.closest("[data-cr]")) openDrawer(); });
+$("view").addEventListener("change", e => { if(e.target.id==="fResp"){ S.resp=e.target.value; render(); } });
+
+// =====================================================================
+//  Assistant CR (copier-coller vers Playground)
+// =====================================================================
+const SAMPLE_CR = `Compte rendu – Comité projet Atlas – 14/10/2026
+Participants : D. Lefèvre (Sponsor), S. Blanc (Dir. Relation client), N. Garcia (DSI), P. Morel (RSSI), K. Haddad (Intégrateur), PMO EXEIS.
+
+1. Conception
+Les spécifications fonctionnelles du portail sont à 85 %. L'architecture technique a été validée en séance, le livrable est terminé.
+L'intégrateur annonce une semaine de retard sur les spécifications d'interfaces, en raison de la complexité des API du SI contrats. Le comité estime que ce sujet technique est plus impactant qu'anticipé.
+Le jalon de fin de conception est reporté au 06/11. La date de mise en production du 01/03/2027 est maintenue.
+
+2. Sécurité
+La RSSI a validé la politique d'authentification SSO. Le blocage sur ce sujet est levé.
+
+3. Organisation
+La liste des key users est reçue pour 8 agences sur 12 ; le solde est attendu pour le 23/10.
+La Direction Relation client prend en charge la réalisation de la formation et en reste garante. Le PMO EXEIS passe en appui.
+
+4. Budget
+L'intégrateur a présenté un devis de 12 k€ pour un connecteur GED. Le comité l'accepte, financé sur la provision pour risques.
+
+5. Risques
+N. Garcia signale que la DSI applique un gel des changements du 14/12 au 08/01, ce qui pourrait limiter la mise à disposition des environnements pendant le sprint 3.
+
+Actions décidées :
+- K. Haddad : livrer les spécifications d'interfaces pour le 06/11.
+- N. Garcia : confirmer le calendrier de gel des changements de décembre pour le 21/10.
+- PMO EXEIS : mettre à jour le planning de réalisation pour intégrer le gel, pour le 28/10.`;
+// Réponse type pour le CR d'exemple ; la dernière proposition est volontairement inventée (contrôle des citations).
+const SIM = {"resume":"Le comité acte l'avancement de la conception et la levée du blocage SSO. Les spécifications d'interfaces glissent d'une semaine et le jalon de fin de conception passe au 06/11, MEP maintenue. Un devis de 12 k€ est accepté sur la provision.","modifications":[
+ {"onglet":"planning","operation":"modifier","id":"T-02","changements":{"Avancement":85},"justification":"Avancement communiqué en séance.","citation":"Les spécifications fonctionnelles du portail sont à 85 %.","confiance":"haute"},
+ {"onglet":"planning","operation":"modifier","id":"T-03","changements":{"Avancement":100,"Statut":"Terminé"},"justification":"Livrable validé et terminé.","citation":"L'architecture technique a été validée en séance, le livrable est terminé.","confiance":"haute"},
+ {"onglet":"planning","operation":"modifier","id":"T-04","changements":{"Fin":"06/11/2026","Statut":"En retard"},"justification":"Une semaine de retard annoncée : fin repoussée du 30/10 au 06/11.","citation":"L'intégrateur annonce une semaine de retard sur les spécifications d'interfaces","confiance":"haute"},
+ {"onglet":"planning","operation":"modifier","id":"J-02","changements":{"Début":"06/11/2026","Fin":"06/11/2026"},"justification":"Jalon reporté par le comité.","citation":"Le jalon de fin de conception est reporté au 06/11.","confiance":"haute"},
+ {"onglet":"actions","operation":"modifier","id":"A-04","changements":{"Statut":"Terminé"},"justification":"La politique SSO est validée.","citation":"La RSSI a validé la politique d'authentification SSO.","confiance":"haute"},
+ {"onglet":"actions","operation":"modifier","id":"A-02","changements":{"Échéance":"23/10/2026"},"justification":"Liste partielle reçue, solde attendu au 23/10.","citation":"le solde est attendu pour le 23/10","confiance":"haute"},
+ {"onglet":"actions","operation":"ajouter","id":"A-09","changements":{"Action":"Livrer les spécifications d'interfaces","Responsable":"K. Haddad (Intégrateur)","Création":"14/10/2026","Échéance":"06/11/2026","Statut":"En cours","Priorité":"Haute","Source":"Comité projet du 14/10/2026"},"justification":"Action décidée en comité.","citation":"K. Haddad : livrer les spécifications d'interfaces pour le 06/11.","confiance":"haute"},
+ {"onglet":"actions","operation":"ajouter","id":"A-10","changements":{"Action":"Confirmer le calendrier de gel des changements de décembre","Responsable":"N. Garcia (DSI)","Création":"14/10/2026","Échéance":"21/10/2026","Statut":"À faire","Priorité":"Haute","Source":"Comité projet du 14/10/2026"},"justification":"Action décidée en comité.","citation":"N. Garcia : confirmer le calendrier de gel des changements de décembre pour le 21/10.","confiance":"haute"},
+ {"onglet":"actions","operation":"ajouter","id":"A-11","changements":{"Action":"Mettre à jour le planning de réalisation pour intégrer le gel de décembre","Responsable":"PMO EXEIS","Création":"14/10/2026","Échéance":"28/10/2026","Statut":"À faire","Priorité":"Moyenne","Source":"Comité projet du 14/10/2026"},"justification":"Action décidée en comité.","citation":"PMO EXEIS : mettre à jour le planning de réalisation pour intégrer le gel, pour le 28/10.","confiance":"haute"},
+ {"onglet":"budget","operation":"modifier","id":"B-03","changements":{"Prévision fin":167,"Commentaire":"Interfaces : +15 k€ (06/10) et connecteur GED +12 k€ (14/10)"},"justification":"Devis complémentaire accepté.","citation":"L'intégrateur a présenté un devis de 12 k€ pour un connecteur GED.","confiance":"haute"},
+ {"onglet":"budget","operation":"modifier","id":"B-07","changements":{"Prévision fin":43,"Commentaire":"15 k€ puis 12 k€ réaffectés à B-03"},"justification":"Le devis est financé sur la provision.","citation":"Le comité l'accepte, financé sur la provision pour risques.","confiance":"haute"},
+ {"onglet":"risques","operation":"modifier","id":"R-01","changements":{"Probabilité":1,"Statut":"Surveillé"},"justification":"Le blocage SSO est levé ; risque maintenu sous surveillance.","citation":"Le blocage sur ce sujet est levé.","confiance":"moyenne"},
+ {"onglet":"risques","operation":"modifier","id":"R-04","changements":{"Impact":3},"justification":"Le comité juge le sujet plus impactant ; impact relevé de 2 à 3 (déduction).","citation":"Le comité estime que ce sujet technique est plus impactant qu'anticipé.","confiance":"moyenne"},
+ {"onglet":"risques","operation":"ajouter","id":"R-07","changements":{"Risque":"Gel des changements DSI en décembre limitant la mise à disposition des environnements","Catégorie":"Planning","Probabilité":3,"Impact":3,"Plan de réponse":"Confirmer le calendrier de gel et anticiper les environnements avant le 14/12","Propriétaire":"N. Garcia (DSI)","Statut":"Ouvert"},"justification":"Nouveau risque signalé par la DSI, impact possible sur le sprint 3.","citation":"la DSI applique un gel des changements du 14/12 au 08/01","confiance":"moyenne"},
+ {"onglet":"decisions","operation":"ajouter","id":"D-05","changements":{"Date":"14/10/2026","Décision":"Acceptation du devis de 12 k€ pour le connecteur GED, financé sur la provision","Instance":"Comité projet","Porteur":"D. Lefèvre"},"justification":"Décision budgétaire du comité.","citation":"Le comité l'accepte, financé sur la provision pour risques.","confiance":"haute"},
+ {"onglet":"decisions","operation":"ajouter","id":"D-06","changements":{"Date":"14/10/2026","Décision":"Report du jalon de fin de conception au 06/11/2026, mise en production maintenue au 01/03/2027","Instance":"Comité projet","Porteur":"D. Lefèvre"},"justification":"Décision de planning du comité.","citation":"Le jalon de fin de conception est reporté au 06/11.","confiance":"haute"},
+ {"onglet":"raci","operation":"modifier","id":"L-07","changements":{"Dir. Relation client":"A/R","PMO EXEIS":"C"},"justification":"La Direction Relation client réalise et reste garante ; le PMO passe en appui.","citation":"La Direction Relation client prend en charge la réalisation de la formation et en reste garante.","confiance":"haute"},
+ {"onglet":"actions","operation":"modifier","id":"A-06","changements":{"Statut":"Terminé"},"justification":"Le contrat de licences aurait été transmis.","citation":"Le contrat de licences signé a été transmis aux Achats.","confiance":"moyenne"}
+]};
+
+const TYPE_LABEL = {text:"texte",date:"JJ/MM/AAAA",pct:"nombre 0-100",keur:"k€, nombre","1-4":"entier 1 à 4"};
+function buildPrompt(){
+  const data = {}; for(const k of AI_SHEETS) data[k] = S.data[k].map(r => { const o={...r}; delete o["Fin initiale"]; return o; });
+  const cols = AI_SHEETS.map(k => `- ${k} : ${editableCols(k).map(([c,t]) => Array.isArray(t)?`${c} (${t.filter(Boolean).join("|")})`:`${c} (${TYPE_LABEL[t]})`).join(", ")}`).join("\n");
+  return `Tu es l'assistant PMO d'un cabinet de conseil. Analyse le compte rendu de réunion ci-dessous et propose les mises à jour à apporter au fichier de pilotage du projet. Un consultant validera chaque proposition : ne propose que ce que le CR justifie, explicitement ou par conséquence directe.
+
+DATE DE LA RÉUNION : ${$("crDate").value} (${$("crInst").value})
+
+COLONNES MODIFIABLES PAR ONGLET (en plus de la colonne ID)
+${cols}
+
+ÉTAT ACTUEL DU FICHIER (JSON)
+${JSON.stringify(data)}
+
+RÈGLES
+1. "operation" vaut "modifier" (ligne existante : "id" existant, "changements" = uniquement les colonnes qui changent) ou "ajouter" (nouvelle ligne : "id" = prochain identifiant libre de l'onglet, "changements" = toutes les colonnes).
+2. Utilise exactement les noms de colonnes et les valeurs autorisées ci-dessus. Dates au format JJ/MM/AAAA.
+3. Planning : un jalon a "Jalon":"Oui" et Début = Fin (identifiant J-xx). Si une tâche est décalée, vérifie l'impact sur les jalons et propose-le.
+4. Budget : si un montant passe d'un poste à un autre, modifie les deux postes.
+5. RACI : exactement un A (ou A/R) par livrable.
+6. Risques et décisions : ajoute les nouveaux risques et décisions évoqués ; ajuste probabilité, impact ou statut des risques existants si le CR le justifie.
+7. "citation" : copie EXACTE et courte de la phrase du CR qui justifie la proposition. Jamais de citation inventée.
+8. "confiance" : "haute" si c'est écrit explicitement, "moyenne" si tu déduis (ex. une date calculée), "faible" si c'est ambigu. Signale dans "justification" tout point d'attention.
+
+FORMAT DE RÉPONSE : uniquement un objet JSON valide, sans aucun texte avant ou après :
+{"resume":"2 phrases maximum","modifications":[{"onglet":"actions","operation":"modifier","id":"A-02","changements":{"Statut":"Terminé"},"justification":"...","citation":"...","confiance":"haute"}]}
+
+COMPTE RENDU
+"""
+${$("crText").value.trim()}
+"""`;
+}
+
+// --- Appel direct à l'API Claude depuis le navigateur (aucun serveur intermédiaire) ---
+const API_PRICES = {"claude-opus-5-5":[4,20], "claude-sonnet-5-5":[2,10]}; // $ par million de jetons (entrée, sortie)
+let LAST_RUN = null, RUN = null, apiCtl = null;
+const isApi = () => $("iaMode").value === "api";
+function syncIaUI(){
+  const api = isApi();
+  $("apiBox").hidden = !api; $("s2").hidden = api; $("s3").hidden = api;
+  $("btnPrep").textContent = api ? "Analyser avec Claude" : "Préparer le prompt";
+  $("drSub").textContent = api ? "Analyse directe via l'API Claude" : "Copier-coller vers Playground ou une autre IA";
+  $("s4").querySelector(".n").textContent = api ? "2" : "4";
+}
+$("iaMode").addEventListener("change", e => { store.set("pilotage.iaMode", e.target.value); syncIaUI(); });
+$("apiModel").addEventListener("change", e => store.set("pilotage.apiModel", e.target.value));
+$("apiRemember").addEventListener("change", e => { store.set("pilotage.apiKey", e.target.checked ? $("apiKey").value.trim() : ""); });
+function setApiMsg(m, cls=""){ $("apiMsg").textContent = m; $("apiMsg").className = "msg" + (cls ? " "+cls : ""); }
+function apiErrorText(status, body){
+  const m = body && body.error && body.error.message ? body.error.message : "";
+  if(status===401) return "Clé API refusée. Vérifiez-la dans la console Anthropic.";
+  if(status===403) return `Accès refusé par l'API : ${m}`;
+  if(status===429) return "Limite d'utilisation atteinte. Attendez une minute ou vérifiez votre plafond de dépenses.";
+  if(status===529||status>=500) return "Le service Claude est momentanément surchargé. Relancez dans un instant.";
+  if(/credit/i.test(m)) return "Crédit API insuffisant. Ajoutez du crédit dans la console Anthropic.";
+  return `Erreur de l'API (${status}) : ${m}`;
+}
+async function runApi(prompt){
+  const key = $("apiKey").value.trim(), model = $("apiModel").value;
+  if(!key){ setApiMsg("Saisissez votre clé API, ou passez en mode copier-coller.", "err"); return; }
+  if($("apiRemember").checked) store.set("pilotage.apiKey", key);
+  S.proposals = []; $("props").innerHTML = ""; $("s4").classList.add("off");
+  const t0 = performance.now(); apiCtl = new AbortController();
+  $("btnPrep").disabled = true; $("btnStopApi").hidden = false;
+  let text = "", stop = null, inTok = 0, outTok = 0;
+  const secs = () => Math.round((performance.now()-t0)/1000);
+  const tick = setInterval(() => setApiMsg(text ? `Claude rédige ses propositions… ${secs()} s` : `Claude analyse le CR… ${secs()} s`), 1000);
+  setApiMsg("Claude analyse le CR…");
+  try{
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST", signal:apiCtl.signal,
+      headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2026-10-21","anthropic-beta":"server-side-fallback-2026-07-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model, max_tokens:64000, stream:true, output_config:{effort:"high"}, fallbacks:"default", messages:[{role:"user",content:prompt}]}),
+    });
+    if(!res.ok){ let body=null; try{ body=await res.json(); }catch(e){} throw {apiMessage: apiErrorText(res.status, body)}; }
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = "";
+    const onEvent = ev => {
+      if(ev.type==="message_start"){ const u=ev.message.usage||{}; inTok=(u.input_tokens||0)+(u.cache_creation_input_tokens||0)+(u.cache_read_input_tokens||0); }
+      else if(ev.type==="content_block_start" && ev.content_block && ev.content_block.type==="fallback"){ text=""; } // un autre modèle reprend : on repart de sa réponse
+      else if(ev.type==="content_block_delta" && ev.delta && ev.delta.type==="text_delta"){ text+=ev.delta.text; }
+      else if(ev.type==="message_delta"){ if(ev.delta && ev.delta.stop_reason) stop=ev.delta.stop_reason; if(ev.usage && ev.usage.output_tokens) outTok=ev.usage.output_tokens; }
+      else if(ev.type==="error"){ throw {apiMessage: ev.error && ev.error.type==="overloaded_error" ? "Le service Claude est momentanément surchargé. Relancez dans un instant." : `Erreur pendant l'analyse : ${ev.error ? ev.error.message : "inconnue"}`}; }
+    };
+    for(;;){
+      const {done, value} = await reader.read(); if(done) break;
+      buf += dec.decode(value, {stream:true});
+      let i; while((i=buf.indexOf("\n\n"))>=0){ const chunk=buf.slice(0,i); buf=buf.slice(i+2); const data=chunk.split("\n").filter(l=>l.startsWith("data:")).map(l=>l.slice(5).trim()).join(""); if(data) onEvent(JSON.parse(data)); }
+    }
+    if(stop==="refusal") throw {apiMessage:"Claude a refusé de traiter ce texte. Vérifiez le contenu du CR."};
+    if(stop==="max_tokens") throw {apiMessage:"La réponse a été coupée car elle était trop longue. Raccourcissez le CR."};
+    const p = API_PRICES[model], cost = (inTok*p[0]+outTok*p[1])/1e6;
+    RUN = {analyse:secs(), cost};
+    $("resp").value = text; $("btnRead").click(); // même lecture et mêmes contrôles qu'en copier-coller
+    if(S.proposals.length) setApiMsg(`Analyse terminée en ${secs()} s · coût estimé ${cost.toFixed(2).replace(".",",")} $`, "ok");
+    else setApiMsg($("readMsg").textContent || "Claude n'a proposé aucune modification pour ce CR.", $("readMsg").classList.contains("err") ? "err" : "");
+  }catch(e){
+    if(e && e.name==="AbortError") setApiMsg("Analyse arrêtée.");
+    else if(e && e.apiMessage) setApiMsg(e.apiMessage, "err");
+    else { console.error(e); setApiMsg("Connexion à l'API impossible. Vérifiez Internet, ou un éventuel blocage du réseau.", "err"); }
+  }finally{ clearInterval(tick); $("btnPrep").disabled=false; $("btnStopApi").hidden=true; }
+}
+$("btnStopApi").onclick = () => apiCtl && apiCtl.abort();
+function initIa(){
+  const m=store.get("pilotage.iaMode"); if(m) $("iaMode").value=m;
+  const mo=store.get("pilotage.apiModel"); if(mo && API_PRICES[mo]) $("apiModel").value=mo;
+  const k=store.get("pilotage.apiKey"); if(k){ $("apiKey").value=k; $("apiRemember").checked=true; }
+  syncIaUI();
+}
+initIa();
+function openDrawer(){ if(!$("crDate").value) $("crDate").value = todayStr(); const v=store.get("pilotage.valBy"); if(v) $("valBy").value=v; $("drawer").hidden=false; $("scrim").hidden=false; $("crText").focus(); }
+function closeDrawer(){ $("drawer").hidden=true; $("scrim").hidden=true; }
+$("openCR").onclick = openDrawer; $("closeCR").onclick = closeDrawer; $("scrim").onclick = closeDrawer;
+document.addEventListener("keydown", e => { if(e.key==="Escape" && !$("drawer").hidden) closeDrawer(); });
+$("valBy").addEventListener("change", e => store.set("pilotage.valBy", e.target.value));
+const stepOn = n => $("s"+n).classList.remove("off");
+const stepDone = n => $("s"+n).querySelector(".n").classList.add("done");
+$("btnSampleCR").onclick = () => { $("crText").value = SAMPLE_CR; $("crDate").value = "14/10/2026"; $("crInst").value = "Comité projet"; };
+$("btnPrep").onclick = () => {
+  if($("crText").value.trim().length < 40){ toast("Collez un compte rendu avant de préparer le prompt."); return; }
+  const d = normDate($("crDate").value, REF()); if(!d){ toast("La date de réunion doit être au format JJ/MM/AAAA."); return; } $("crDate").value = d;
+  RUN = null; CR_T0 = performance.now();
+  if(isApi()){ runApi(buildPrompt()); return; }
+  $("prompt").value = buildPrompt(); stepDone(1); stepOn(2); stepOn(3);
+  $("copyMsg").textContent = `${$("prompt").value.length.toLocaleString("fr-FR")} caractères`; $("copyMsg").className="msg";
+  $("s2").scrollIntoView({behavior:"smooth",block:"start"});
+};
+$("btnCopy").onclick = () => {
+  const ta=$("prompt");
+  const ok = () => { $("copyMsg").textContent="Prompt copié. Collez-le dans Playground."; $("copyMsg").className="msg ok"; stepDone(2); };
+  const fallback = () => { ta.focus(); ta.select(); let done=false; try{ done=document.execCommand("copy"); }catch(e){} if(done) ok(); else { $("copyMsg").textContent="Texte sélectionné : appuyez sur Ctrl+C pour copier."; $("copyMsg").className="msg"; } };
+  try{ navigator.clipboard.writeText(ta.value).then(ok, fallback); }catch(e){ fallback(); }
+};
+$("btnSim").onclick = () => { $("resp").value = JSON.stringify(SIM, null, 1); setRead("Réponse type chargée. Cliquez sur « Lire les propositions »."); };
+$("btnRead").onclick = () => {
+  const raw = $("resp").value.trim();
+  if(!raw){ setRead("Collez d'abord la réponse de Playground.", true); return; }
+  const obj = parseLoose(raw);
+  if(!obj){ setRead("La réponse ne contient pas de JSON lisible. Vérifiez que vous avez copié la réponse en entier, ou demandez à Playground de répondre uniquement en JSON.", true); return; }
+  S.resume = String(obj.resume||"");
+  const {dropped} = buildProposals(obj);
+  if(!S.proposals.length){ setRead(`Aucune proposition exploitable dans cette réponse${dropped?` (${dropped} écartée(s) car incohérentes avec le fichier)`:""}.`, true); return; }
+  setRead(`${S.proposals.length} proposition(s) lue(s)${dropped?`, ${dropped} écartée(s) car incohérentes avec le fichier`:""}.`, false, true);
+  stepDone(3); stepOn(4); renderProps(); $("s4").scrollIntoView({behavior:"smooth",block:"start"});
+};
+function setRead(m, err, ok){ $("readMsg").textContent=m; $("readMsg").className = "msg" + (err?" err":ok?" ok":""); }
+function parseLoose(t){
+  try{ return JSON.parse(t); }catch(e){}
+  const f = /```(?:json)?\s*([\s\S]*?)```/i.exec(t); if(f){ try{ return JSON.parse(f[1]); }catch(e){} }
+  const a=t.indexOf("{"), b=t.lastIndexOf("}"); if(a>=0&&b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
+  return null;
+}
+function normVal(type, v){
+  if(Array.isArray(type)){ const hit=type.find(o=>squash(o)===squash(v)); return hit!==undefined?{v:hit}:{v:String(v??""),err:`valeur « ${v} » non autorisée (${type.filter(Boolean).join(", ")})`}; }
+  if(type==="date"){ const d=normDate(v, REF()); return d?{v:d}:{v:String(v??""),err:`date « ${v} » illisible`}; }
+  if(type==="pct"){ const n=Math.round(Number(String(v).replace(",",".").replace(/[^\d.-]/g,""))); return isNaN(n)||n<0||n>100?{v,err:"avancement hors de 0-100"}:{v:n}; }
+  if(type==="keur"){ const n=Number(String(v).replace(/\s/g,"").replace(",",".").replace(/[^\d.-]/g,"")); return isNaN(n)?{v,err:"montant illisible"}:{v:n}; }
+  if(type==="1-4"){ const n=Math.round(Number(v)); return n>=1&&n<=4?{v:n}:{v,err:"échelle 1 à 4 attendue"}; }
+  return {v:String(v??"")};
+}
+const squashQ = s => squash(s).replace(/[.;:,!?]+$/,"");
+function citationFound(c){ const q=squashQ(c); return q.length>=8 && squash($("crText").value).includes(q); }
+function nextIdFor(sheet, jalon){
+  const pre = sheet==="planning" ? (jalon?"J":"T") : SHEETS[sheet].prefix;
+  const used = [...S.data[sheet].map(r=>r.ID), ...S.proposals.filter(p=>p.onglet===sheet).map(p=>p.id)].map(String).filter(id=>id.startsWith(pre+"-")).map(id=>parseInt(id.split("-")[1],10)).filter(n=>!isNaN(n));
+  return `${pre}-${pad(Math.max(0,...used)+1)}`;
+}
+function buildProposals(obj){
+  const list = Array.isArray(obj) ? obj : Array.isArray(obj.modifications) ? obj.modifications : [];
+  S.proposals=[]; let dropped=0;
+  for(const m of list){
+    const sheet = squash(m?.onglet).replace(/s?$/,"s").replace("racis","raci");
+    const key = AI_SHEETS.find(k => k===sheet || k===squash(m?.onglet));
+    if(!key || !m.changements || typeof m.changements!=="object"){ dropped++; continue; }
+    const op = squash(m.operation).startsWith("aj") ? "ajouter" : "modifier";
+    const p = {onglet:key, operation:op, changements:{}, before:{}, errs:[], justification:String(m.justification||""), citation:String(m.citation||""), confiance:["haute","moyenne","faible"].includes(m.confiance)?m.confiance:"moyenne"};
+    const ed = editableCols(key);
+    for(const [c,v] of Object.entries(m.changements)){ const col = ed.find(([n])=>squash(n)===squash(c)); if(!col) continue; const n=normVal(col[1],v); p.changements[col[0]]=n.v; if(n.err) p.errs.push(`${col[0]} : ${n.err}`); }
+    if(op==="modifier"){
+      const row = S.data[key].find(r=>squash(r.ID)===squash(m.id)); if(!row){ dropped++; continue; }
+      p.id=row.ID; for(const c of Object.keys(p.changements)){ if(String(row[c])===String(p.changements[c])) delete p.changements[c]; else p.before[c]=row[c]; }
+      if(!Object.keys(p.changements).length){ dropped++; continue; }
+    } else {
+      for(const [c,t] of ed) if(!(c in p.changements)) p.changements[c] = t==="keur" ? 0 : (key==="planning"&&c==="Jalon") ? "Non" : (key==="planning"&&c==="Avancement") ? 0 : "";
+      const exists = id => S.data[key].some(r=>r.ID===id) || S.proposals.some(x=>x.onglet===key&&x.id===id);
+      p.id = m.id && !exists(String(m.id)) ? String(m.id) : nextIdFor(key, p.changements.Jalon==="Oui");
+    }
+    p.cite = citationFound(p.citation);
+    p.checked = p.cite && !p.errs.length;
+    S.proposals.push(p);
+  }
+  return {dropped};
+}
+function checksFor(p){
+  const out=[]; const row = p.operation==="modifier" ? {...S.data[p.onglet].find(r=>r.ID===p.id), ...p.changements} : {ID:p.id,...p.changements};
+  out.push(p.cite ? {ok:true,t:"Citation retrouvée dans le CR"} : {ok:false,t:"Citation introuvable dans le CR : possible invention de l'IA"});
+  p.errs.forEach(e => out.push({ok:false,t:e}));
+  if(p.onglet==="planning"){ const s=pd(row.Début), e=pd(row.Fin); if(s&&e&&e<s) out.push({ok:false,t:"La date de fin est avant la date de début"});
+    const mep=mepMs(); if(mep && e && row.ID!==mep.ID && e>pd(mep.Fin) && !/hypercare|garantie|vsr/i.test(row.Tâche||"")) out.push({ok:false,t:`Dépasse la mise en production (${mep.Fin})`}); }
+  if(p.onglet==="raci"){ const pb=raciCheck(row); out.push(pb.length?{ok:false,t:`Contrôle RACI : ${pb.join(", ")}`}:{ok:true,t:"Contrôle RACI : un seul A, au moins un R"}); }
+  if(p.onglet==="budget"){
+    if("Budget initial" in p.changements && p.operation==="modifier") out.push({ok:false,t:"Modifie le budget initial (référence validée)"});
+    const tot = S.data.budget.reduce((a,b)=>a+(b.ID===p.id?Number(row["Prévision fin"])||0:Number(b["Prévision fin"])||0),0) + (p.operation==="ajouter"?Number(row["Prévision fin"])||0:0);
+    out.push({ok:true,t:`Prévision totale après modification : ${keur(tot)}`});
+  }
+  if(p.onglet==="risques"){ const c=(Number(row.Probabilité)||0)*(Number(row.Impact)||0); out.push({ok:c<9,info:true,t:`Criticité après modification : ${c}${c>=9?" (critique)":""}`}); }
+  return out;
+}
+const OPL={modifier:"Modification",ajouter:"Ajout"};
+const LBL = k => SHEETS[k].name;
+function renderProps(){
+  const P=S.proposals, counts={}; P.forEach(p=>counts[p.onglet]=(counts[p.onglet]||0)+1);
+  const warned = P.filter(p=>!p.cite||p.errs.length).length;
+  let h = `<div class="sumbox"><b>${P.length} proposition(s) · ${Object.entries(counts).map(([k,n])=>`${n} ${LBL(k).toLowerCase()}`).join(", ")}</b>${esc(S.resume)}${warned?`<div style="margin-top:6px;color:var(--warn);font-weight:600">${warned} proposition(s) décochée(s) d'office : à vérifier.</div>`:""}</div><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">`;
+  P.forEach((p,i) => {
+    const isAdd=p.operation==="ajouter", ck=checksFor(p), bad=ck.some(c=>!c.ok&&!c.info);
+    h += `<div class="pc ${isAdd?"isadd":""} ${p.checked?"":"off"} ${bad?"warned":""}">
+      <div class="pc-h"><input type="checkbox" id="pk${i}" data-i="${i}" ${p.checked?"checked":""} aria-label="Retenir la proposition ${i+1}"><span class="tg">${LBL(p.onglet)}</span><span class="op ${isAdd?"add":""}">${OPL[p.operation]}</span><span class="idc">${esc(p.id)}</span><span class="pill conf ${p.confiance==="haute"?"p-ok":p.confiance==="moyenne"?"p-warn":"p-bad"}">Confiance ${p.confiance}</span></div>
+      <div class="chg-l">${Object.entries(p.changements).filter(([c,v])=>!(isAdd&&v==="")).map(([c,v],j)=>`<span class="k">${esc(c)}</span><span class="nv">${isAdd?"":`<del>${esc(p.before[c]===""||p.before[c]===undefined?"(vide)":p.before[c])}</del><span>→</span>`}<input type="text" id="pv${i}_${j}" data-i="${i}" data-c="${esc(c)}" value="${esc(v)}" aria-label="Nouvelle valeur ${esc(c)}"></span>`).join("")}</div>
+      ${p.justification?`<div class="why">${esc(p.justification)}</div>`:""}
+      ${p.citation?`<div class="quote">« ${esc(p.citation)} »</div>`:""}
+      <div class="checks">${ck.map(c=>`<span class="${c.ok?"ok":"w"}">${c.ok?"✓":"⚠"} ${esc(c.t)}</span>`).join("")}</div>
+    </div>`;
+  });
+  h += `</div><div class="apply-bar"><button class="btn primary" id="btnApply">Appliquer la sélection (${P.filter(p=>p.checked).length})</button><button class="btn" id="btnRejectAll">Tout rejeter</button></div>`;
+  $("props").innerHTML = h;
+}
+$("props").addEventListener("change", e => {
+  const i=e.target.dataset.i; if(i===undefined) return; const p=S.proposals[i];
+  if(e.target.type==="checkbox"){ p.checked=e.target.checked; renderProps(); return; }
+  const c=e.target.dataset.c, n=normVal(typeOf(p.onglet,c), e.target.value);
+  p.changements[c]=n.v; p.errs = p.errs.filter(x=>!x.startsWith(c+" :")); if(n.err) p.errs.push(`${c} : ${n.err}`); renderProps();
+});
+$("props").addEventListener("click", e => {
+  if(e.target.id==="btnApply") applyProps();
+  if(e.target.id==="btnRejectAll"){ S.proposals=[]; $("props").innerHTML=`<p class="empty">Propositions rejetées. Le fichier n'a pas été modifié.</p>`; }
+});
+function applyProps(){
+  const sel=S.proposals.filter(p=>p.checked); if(!sel.length){ toast("Aucune proposition cochée."); return; }
+  const date=$("crDate").value, src=`${$("crInst").value} du ${date}`, by=$("valBy").value.trim()||"Consultant EXEIS";
+  S.recentRows=new Set(); S.recentCells=new Set(); const entries=[]; let n=0;
+  for(const p of sel){
+    const sh=LBL(p.onglet);
+    if(p.operation==="ajouter"){
+      const row={ID:p.id,...p.changements}; if(p.onglet==="planning") row["Fin initiale"]=row.Fin;
+      S.data[p.onglet].push(row); entries.push({"Date":date,"Onglet":sh,"ID":p.id,"Champ":"(nouvelle ligne)","Avant":"","Après":Object.values(p.changements).filter(v=>v!==""&&v!==0).slice(0,2).join(" · "),"Source":src,"Validé par":by}); n++;
+    } else {
+      const row=S.data[p.onglet].find(r=>r.ID===p.id); if(!row) continue;
+      for(const [c,v] of Object.entries(p.changements)){ entries.push({"Date":date,"Onglet":sh,"ID":p.id,"Champ":c,"Avant":String(row[c]??""),"Après":String(v),"Source":src,"Validé par":by}); row[c]=v; S.recentCells.add(`${p.onglet}|${p.id}|${c}`); n++; }
+    }
+    S.recentRows.add(`${p.onglet}|${p.id}`);
+  }
+  S.journal = [...entries.reverse(), ...S.journal];
+  // Point d'historique à la date de la réunion (alimente les courbes)
+  let h = S.historique.find(x=>x.Date===date);
+  if(!h){ h={"Date":date,"Avancement réel (%)":"","Réalisé cumulé (k€)":"","Plan de dépenses cumulé (k€)":""}; S.historique.push(h); S.historique.sort((a,b)=>(pd(a.Date)||0)-(pd(b.Date)||0)); }
+  if(tasks().length) h["Avancement réel (%)"] = Math.round(globalActual()); h["Réalisé cumulé (k€)"] = sum(S.data.budget,"Réalisé");
+  LAST_RUN = {n, src, total: CR_T0 ? Math.round((performance.now()-CR_T0)/1000) : null, cost: RUN ? RUN.cost : null};
+  S.proposals=[]; closeDrawer(); resetDrawer(); S.view="synthese"; render(); window.scrollTo({top:0});
+  if(MODE.addin){
+    addinWriteAll().then(() => toast(`${n} modification(s) écrite(s) dans le classeur et tracée(s) dans le Journal.`, 5000))
+      .catch(e => { console.error(e); toast(`Écriture dans le classeur impossible : ${e.message||e}. Vérifiez que le classeur n'est pas en lecture seule.`, 8000); });
+  } else { setDirty(true); toast(`${n} modification(s) appliquée(s) et tracée(s). Pensez à enregistrer le fichier.`, 5000); }
+}
+let CR_T0 = null;
+function resetDrawer(){ setApiMsg(""); ["s2","s3","s4"].forEach(s=>$(s).classList.add("off")); document.querySelectorAll(".stp .n").forEach(n=>n.classList.remove("done")); $("crText").value=""; $("prompt").value=""; $("resp").value=""; $("props").innerHTML=""; setRead(""); $("copyMsg").textContent=""; }
+
+// =====================================================================
+//  Mode add-in Excel : lecture et écriture directes dans le classeur ouvert
+// =====================================================================
+const KNOWN_SHEETS = () => [FICHE_NAME, ...AI_SHEETS.map(k=>SHEETS[k].name), SHEETS.journal.name, SHEETS.historique.name];
+// Lit les onglets du classeur et les présente sous la même forme qu'un fichier .xlsx lu par la bibliothèque
+async function addinReadWorkbook(){
+  return Excel.run(async ctx => {
+    const wss = ctx.workbook.worksheets; wss.load("items/name"); await ctx.sync();
+    const wanted = KNOWN_SHEETS().map(squash);
+    const targets = wss.items.filter(w => wanted.includes(squash(w.name)));
+    const used = targets.map(w => { const r = w.getUsedRangeOrNullObject(true); r.load(["values","numberFormat","rowIndex","columnIndex"]); return [w.name, r]; });
+    await ctx.sync();
+    const wb = {SheetNames:[], Sheets:{}};
+    for(const [name, r] of used){
+      const ws = {}; wb.SheetNames.push(name); wb.Sheets[name] = ws;
+      if(r.isNullObject){ continue; }
+      let maxR=0, maxC=0;
+      r.values.forEach((row,i) => row.forEach((v,j) => {
+        if(v===""||v===null) return;
+        const R=r.rowIndex+i, C=r.columnIndex+j; maxR=Math.max(maxR,R); maxC=Math.max(maxC,C);
+        ws[XLSX.utils.encode_cell({r:R,c:C})] = {v, t: typeof v==="number" ? "n" : typeof v==="boolean" ? "b" : "s", z: r.numberFormat[i][j], w: String(v)};
+      }));
+      ws["!ref"] = `A1:${XLSX.utils.encode_cell({r:maxR,c:maxC})}`;
+    }
+    return wb;
+  });
+}
+function sheetMatrix(cols, rows){
+  const values = [cols.map(([c])=>c)], formats = [cols.map(()=>"@")];
+  rows.forEach(o => {
+    values.push(cols.map(([c,t]) => { const v=o[c]; if(v===undefined||v===null||v==="") return ""; if(t==="date" && strToSerial(v)!==null) return strToSerial(v); if((t==="pct"||t==="keur"||t==="num"||t==="1-4") && !isNaN(Number(v))) return Number(v); return String(v); }));
+    formats.push(cols.map(([c,t]) => t==="date" ? "dd/mm/yyyy" : (t==="pct"||t==="keur"||t==="num"||t==="1-4") ? "General" : "@"));
+  });
+  return {values, formats};
+}
+async function addinWriteAll(){
+  const plan = [[FICHE_NAME, [["Rubrique","text"],["Libellé","text"],["Valeur","text"]], S.fiche],
+    ...AI_SHEETS.map(k => [SHEETS[k].name, colsOf(k), S.data[k]]),
+    [SHEETS.journal.name, SHEETS.journal.cols, [...S.journal].reverse()],
+    [SHEETS.historique.name, SHEETS.historique.cols, S.historique]];
+  await Excel.run(async ctx => {
+    const wss = ctx.workbook.worksheets; wss.load("items/name"); await ctx.sync();
+    const sheets = plan.map(([name]) => wss.items.find(w => squash(w.name)===squash(name)) || wss.add(name));
+    const used = sheets.map(ws => { const u = ws.getUsedRangeOrNullObject(true); u.load("address"); return u; });
+    await ctx.sync();
+    plan.forEach(([name, cols, rows], i) => {
+      const ws = sheets[i]; if(!used[i].isNullObject) used[i].clear("Contents");
+      const {values, formats} = sheetMatrix(cols, rows);
+      const rng = ws.getRangeByIndexes(0, 0, values.length, cols.length);
+      rng.numberFormat = formats; rng.values = values;
+      const hdr = ws.getRangeByIndexes(0, 0, 1, cols.length); hdr.format.font.bold = true; hdr.format.fill.color = "#E7E9FB"; hdr.format.font.color = "#161A24";
+      ws.freezePanes.freezeRows(1);
+      rng.format.autofitColumns();
+    });
+    await ctx.sync();
+  });
+}
+async function addinReload(silent){
+  try{
+    const wb = await addinReadWorkbook();
+    const hasAny = AI_SHEETS.some(k => wb.SheetNames.some(n => squash(n)===squash(SHEETS[k].name)));
+    if(!hasAny){ showAddinWelcome(); return; }
+    const view = S ? S.view : "synthese";
+    S = loadWorkbook(wb); S.view = view; FILE = {name:"Classeur Excel ouvert", handle:null, dirty:false};
+    startApp(); if(!silent) toast(S.warnings.length ? `Classeur relu avec ${S.warnings.length} remarque(s) : voir la Synthèse.` : "Classeur relu.");
+  }catch(e){ console.error(e); toast(`Lecture du classeur impossible : ${e.message||e}`, 8000); }
+}
+function showAddinWelcome(){
+  $("app").hidden=true; $("welcome").hidden=false; $("drop").hidden=true;
+  document.querySelector("#welcome h1").textContent = "Ce classeur n'est pas encore un fichier de pilotage";
+  document.querySelector("#welcome .lead").textContent = "Créez la structure EXEIS dans ce classeur : les onglets Fiche projet, Planning, Actions, Budget, RACI, Risques, Décisions, Journal et Historique seront ajoutés. Les onglets existants ne sont pas modifiés.";
+  $("libNote").textContent = "Astuce : partez d'un classeur vide (Fichier > Nouveau) pour un nouveau projet.";
+}
+async function addinCreate(state, view){
+  try{ S = state; S.view = view; await addinWriteAll(); FILE = {name:"Classeur Excel ouvert", handle:null, dirty:false}; startApp(); toast("Structure créée dans le classeur."); }
+  catch(e){ console.error(e); S=null; toast(`Création impossible : ${e.message||e}`, 8000); }
+}
+// Fenêtre « grand écran » : même page, en lecture seule, alimentée par le panneau
+$("btnBig").onclick = () => {
+  const url = location.origin + location.pathname + "?mode=dialog";
+  Office.context.ui.displayDialogAsync(url, {height:88, width:88, displayInIframe:false}, res => {
+    if(res.status !== Office.AsyncResultStatus.Succeeded){ toast("Impossible d'ouvrir la fenêtre grand écran. Fermez une éventuelle fenêtre déjà ouverte."); return; }
+    const dlg = res.value;
+    dlg.addEventHandler(Office.EventType.DialogMessageReceived, a => {
+      if(a.message === "ready") dlg.messageChild(JSON.stringify({fiche:S.fiche, actors:S.actors, data:S.data, journal:S.journal, historique:S.historique, view: S.view==="aide" ? "synthese" : S.view}));
+    });
+  });
+};
+function dialogBoot(){
+  MODE.readonly = true;
+  $("welcome").hidden = true;
+  Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, arg => {
+    const p = JSON.parse(arg.message); S = Object.assign(emptyState(), p); FILE = {name:"Grand écran", handle:null, dirty:false}; startApp();
+  }, () => Office.context.ui.messageParent("ready"));
+}
+if(window.Office && Office.onReady){
+  Office.onReady(info => {
+    if(MODE.dialog) return dialogBoot();
+    if(info && info.host === Office.HostType.Excel){ MODE.addin = true; $("welcome").hidden = true; addinReload(true); }
+  });
+}
+
+// Bibliothèque Excel absente (pas d'accès Internet)
+window.addEventListener("load", () => { if(!window.XLSX){ $("libNote").innerHTML = "<b style='color:var(--bad)'>La bibliothèque de lecture Excel n'a pas pu se charger.</b> Vérifiez la connexion Internet puis rechargez la page (F5)."; } });
+</script>
+</body>
+</html>
