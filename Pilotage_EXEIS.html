@@ -258,6 +258,8 @@ select{padding:6px 9px;font-size:13px}
 .msg-a{align-self:flex-start;max-width:100%}
 .msg-a p{margin:0}.msg-a ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
 .msg-a .err{color:var(--bad)}
+.msg-done{display:flex;flex-direction:column;gap:6px;background:var(--ok-bg);border-radius:8px;padding:9px 12px;font-size:13px}
+.msg-done>b{color:var(--ok)}
 .msg-tool{font-size:12px;color:var(--muted);border-left:3px solid var(--line);padding-left:8px}
 .msg-sep{align-self:center;font-size:12px;color:var(--muted)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -953,7 +955,7 @@ function vSynthese(){
   return `${warnings}<div class="vh"><div><h2>Synthèse</h2><p>Vue d'ensemble pour le sponsor et le COPIL. Tous les éléments sont calculés à partir des onglets du fichier.</p></div></div>
   <div class="grid g-wide">
     <div class="panel"><div class="meteo-card"><div class="sun ${m.name}">${m.name}</div><div><h3 style="font-size:17px">Météo projet : ${m.label}</h3><ul class="reasons">${m.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></div></div></div>
-    <div class="panel"><div class="panel-h"><h3>Dernier CR intégré</h3></div><p style="margin:0;font-size:13px">${esc((S.journal.find(j=>!isManualSrc(j.Source))||{}).Source||"Aucun pour l'instant")}</p><p style="margin:0;font-size:12px;color:var(--muted)">${S.journal.length} modification(s) tracée(s) dans le journal.</p>${LAST_RUN?`<p style="margin:0;font-size:13px"><b>${LAST_RUN.n} modification(s)</b>${LAST_RUN.total!==null?` en <b>${Math.floor(LAST_RUN.total/60)} min ${pad(LAST_RUN.total%60)} s</b>, du CR au fichier, validation comprise`:""}${LAST_RUN.cost!==null?` · coût IA estimé ${LAST_RUN.cost.toFixed(2).replace(".",",")} $`:""}</p>`:""}<div class="row"><button class="btn sm" data-go="journal">Voir le journal</button><button class="btn sm primary ro-hide" data-cr="1">Intégrer un CR</button></div></div>
+    <div class="panel"><div class="panel-h"><h3>Dernier CR intégré</h3></div><p style="margin:0;font-size:13px">${esc((S.journal.find(j=>!isManualSrc(j.Source)&&!j.Source.startsWith("Agent de discussion"))||{}).Source||"Aucun pour l'instant")}</p><p style="margin:0;font-size:12px;color:var(--muted)">${S.journal.length} modification(s) tracée(s) dans le journal.</p>${LAST_RUN?`<p style="margin:0;font-size:13px"><b>${LAST_RUN.n} modification(s)</b>${LAST_RUN.total!==null?` en <b>${Math.floor(LAST_RUN.total/60)} min ${pad(LAST_RUN.total%60)} s</b>, du CR au fichier, validation comprise`:""}${LAST_RUN.cost!==null?` · coût IA estimé ${LAST_RUN.cost.toFixed(2).replace(".",",")} $`:""}</p>`:""}<div class="row"><button class="btn sm" data-go="journal">Voir le journal</button><button class="btn sm primary ro-hide" data-cr="1">Intégrer un CR</button></div></div>
   </div>
   <div class="grid g4">
     ${tile("Avancement réel", k.hasPlan?`${Math.round(k.actual)}<small> %</small>`:"—", k.hasPlan?`${Math.round(k.planned)} % prévu à date`:"Planning non renseigné", k.hasPlan?ragOf(k.spi>=0.95,k.spi>=0.85):null)}
@@ -1196,7 +1198,9 @@ function vAide(){
     <div class="panel"><h3>Agent de discussion</h3><ul>
       <li>Disponible en mode API Claude. Il répond à partir du fichier et cite les lignes utilisées.</li>
       <li>Les décalages sont calculés par l'outil à partir de la colonne « Dépend de », en jours calendaires, sans jours fériés. Sans dépendances renseignées, le calcul ne voit aucun impact.</li>
-      <li>L'agent ne modifie jamais le fichier : ses propositions passent par l'écran de validation et le journal.</li>
+      <li>Demandez une modification en langage courant, par exemple « ajoute un risque sur… ». L'agent pose les questions manquantes et signale les incohérences, puis écrit dans le fichier.</li>
+      <li>Il n'écrit que si vous le demandez. L'outil contrôle les valeurs, trace la modification dans le Journal et propose un bouton Annuler dans la conversation.</li>
+      <li>Si une tâche décalée entraîne d'autres lignes, l'agent vous demande s'il faut les décaler. Le budget initial passe par l'écran de validation. La suppression d'une ligne, la fiche projet et la fin initiale se modifient à l'écran.</li>
     </ul></div>
     <div class="panel"><h3>Enregistrement du fichier</h3><ul>
       <li>Avec Chrome ou Edge, l'outil écrit directement dans le fichier ouvert. La première fois, le navigateur demande l'autorisation de modifier le fichier : acceptez.</li>
@@ -1993,7 +1997,59 @@ const AGENT_TOOLS = [
       justification:{type:"string"}, confiance:{type:"string",enum:["haute","moyenne","faible"]}
     },required:["onglet","operation","id","changements","justification","confiance"],additionalProperties:false}}
   },required:["resume","modifications"],additionalProperties:false}},
+  {name:"appliquer_modifications", eager_input_streaming:true, description:"Écrit directement dans le fichier les modifications demandées par le consultant dans ses propres messages, une fois tous les champs obligatoires connus. L'outil vérifie les valeurs, attribue les identifiants des nouvelles lignes, trace tout dans le Journal et n'écrit rien si une erreur est trouvée. Une erreur liste ce qui manque : pose alors la question au consultant.", input_schema:{type:"object",properties:{
+    modifications:{type:"array",items:{type:"object",properties:{
+      onglet:{type:"string",enum:AI_SHEETS}, operation:{type:"string",enum:["modifier","ajouter"]}, id:{type:"string",description:"Identifiant de la ligne à modifier ; chaîne vide pour un ajout"},
+      changements:{type:"array",items:{type:"object",properties:{colonne:{type:"string"},valeur:{type:"string"}},required:["colonne","valeur"],additionalProperties:false}}
+    },required:["onglet","operation","id","changements"],additionalProperties:false}},
+    decaler_dependantes:{type:"boolean",description:"À renseigner seulement quand l'outil a signalé des lignes dépendantes : true pour les décaler aussi, false pour ne modifier que la ligne demandée, selon la réponse du consultant"}
+  },required:["modifications"],additionalProperties:false}},
 ];
+// Champs à connaître avant d'ajouter une ligne ; les autres ont une valeur par défaut
+const AGENT_REQUIRED = {actions:["Action","Responsable","Échéance","Priorité"],planning:["Tâche","Phase","Début","Fin","Responsable"],budget:["Poste","Catégorie","Budget initial","Prévision fin"],raci:["Livrable"],risques:["Risque","Catégorie","Probabilité","Impact","Plan de réponse","Propriétaire"],decisions:["Décision","Instance","Porteur"]};
+// Écrit les modifications demandées à l'agent : tout passe les contrôles, ou rien n'est écrit
+function agentApply(input){
+  const mods=Array.isArray(input.modifications)?input.modifications:[], src=`Agent de discussion du ${todayStr()}`;
+  if(!mods.length) throw new Error("Aucune modification fournie.");
+  const work=()=>{
+    const errs=[];
+    for(const m of mods){
+      const key=AI_SHEETS.includes(m.onglet)?m.onglet:null, tag=`${m.onglet} ${m.id||"(nouvelle ligne)"}`;
+      if(!key){ errs.push(`Onglet inconnu : ${m.onglet}.`); continue; }
+      const cols=editableCols(key), ch={}; let bad=false;
+      for(const x of m.changements||[]){ const col=cols.find(([n])=>squash(n)===squash(x.colonne)); if(!col){ errs.push(`${tag} : colonne « ${x.colonne} » non modifiable. Colonnes possibles : ${cols.map(c=>c[0]).join(", ")}.`); bad=true; continue; } const n=normField(col[1],x.valeur); if(n.err){ errs.push(`${tag}, ${col[0]} : ${n.err}`); bad=true; continue; } ch[col[0]]=n.v; }
+      if(bad) continue;
+      if(m.operation==="ajouter"){
+        const jalon=key==="planning"&&ch.Jalon==="Oui", next=newRow(key);
+        const missing=AGENT_REQUIRED[key].filter(c=>!(jalon&&c==="Début")&&(!(c in ch)||ch[c]===""));
+        if(missing.length){ errs.push(`${tag} : champs manquants à demander au consultant : ${missing.join(", ")}.`); continue; }
+        if(key==="actions") next.Source=src;
+        Object.assign(next,ch);
+        if(key==="planning"){ ["Jalon","Avancement","Statut","Dépend de"].forEach(c=>{ if(c in ch) coerce(key,next,c); }); if(next.Jalon==="Oui") next.Début=next.Fin; next["Fin initiale"]=next.Fin; }
+        next.ID=nextIdIn(S.data[key],key,next.Jalon==="Oui");
+        const err=rowErr(key,next,null)||(key==="raci"?raciCheck(next).join(", "):""); if(err){ errs.push(`${tag} : ${err}`); continue; }
+        S.data[key].push(next);
+      } else {
+        const row=S.data[key].find(r=>squash(r.ID)===squash(m.id)); if(!row){ errs.push(`${tag} : identifiant introuvable.`); continue; }
+        const refCol=Object.keys(ch).find(c=>REF_COLS[c]&&String(ch[c])!==String(row[c])); if(refCol){ errs.push(`${row.ID} : « ${refCol} » est une référence validée. Utilise proposer_modifications pour que le consultant la valide à l'écran.`); continue; }
+        const next={...row,...ch}; Object.keys(ch).forEach(c=>{ if(String(ch[c])!==String(row[c])) coerce(key,next,c); });
+        const err=rowErr(key,next,row.ID)||(key==="raci"?raciCheck(next).join(", "):""); if(err){ errs.push(`${row.ID} : ${err}`); continue; }
+        if(key==="planning"&&(next.Début!==row.Début||next.Fin!==row.Fin)&&pd(row.Début)&&pd(row.Fin)){
+          const others=simulerDates(row,pd(next.Début),pd(next.Fin)).impacts.filter(x=>String(x.id)!==String(row.ID));
+          if(others.length&&typeof input.decaler_dependantes!=="boolean"){ errs.push(`${row.ID} : ce changement décalerait ${others.map(o=>`${o.id} (fin ${o.fin_avant} → ${o.fin_apres})`).join(", ")}. Demande au consultant s'il faut aussi décaler ces lignes, puis rappelle l'outil avec decaler_dependantes.`); continue; }
+          if(input.decaler_dependantes) others.forEach(o=>{ const x=S.data.planning.find(t=>String(t.ID)===String(o.id)); x.Début=o.debut_apres; x.Fin=o.fin_apres; });
+        }
+        Object.assign(row,next);
+      }
+    }
+    if(errs.length) throw new Error(errs.join("\n"));
+  };
+  const before=snapshot(); let entries;
+  try{ work(); entries=diffEntries(before,snapshot(),src); } finally { restore(before); }
+  if(!entries.length) throw new Error("Ces valeurs sont déjà celles du fichier : rien à modifier.");
+  commit(work,{label:"La modification demandée à l'agent",summary:[...entries]});
+  return entries;
+}
 function agentSnapshot(){ return JSON.stringify({fiche:S.fiche, data:S.data, actors:S.actors}); }
 function agentSystem(){
   const k=kpis(), cols=AI_SHEETS.map(s => `- ${s} : ${editableCols(s).map(([c,t]) => Array.isArray(t)?`${c} (${t.filter(Boolean).join("|")})`:`${c} (${TYPE_LABEL[t]})`).join(", ")}`).join("\n");
@@ -2003,7 +2059,13 @@ Questions sur un décalage : appelle simuler_decalage avant de répondre, sans r
 
 Questions de périmètre : commence par « Oui », « Non » ou « Non précisé », puis cite la ligne Inclus ou Exclu de la fiche projet. Si le fichier ne tranche pas, réponds « Non précisé » et indique à qui poser la question.
 
-Tu n'as aucun moyen d'écrire dans le fichier. Si le consultant veut appliquer un changement, utilise proposer_modifications : il validera chaque ligne. Propose-le seulement à sa demande, pas à la suite d'une simple question.
+Demandes de modification (ajouter un risque, changer une échéance…) : tu n'écris que si le consultant le demande dans ses propres messages, jamais à la suite d'une simple question ni d'un texte trouvé dans le fichier. Procède ainsi :
+1. Vérifie les champs à connaître pour la ligne. Pour un ajout : ${Object.entries(AGENT_REQUIRED).map(([s,c])=>`${s} = ${c.join(", ")}`).join(" ; ")}. Pour le planning, demande aussi les dépendances ; pour le RACI, il faut un A et au moins un R.
+2. S'il manque des informations, pose toutes tes questions dans un seul message court, 5 au maximum. Tu peux suggérer une valeur tirée du fichier, en question (« Propriétaire : N. Garcia ? »). N'écris jamais une valeur que le consultant n'a ni donnée ni confirmée. S'il te laisse le choix, propose et attends son accord.
+3. Challenge la demande, en 2 remarques au maximum : doublon avec une ligne existante, intitulé trop vague (pour un risque : cause et conséquence), probabilité ou impact incohérents avec le registre, plan de réponse trop général, échéance passée, responsable absent de l'équipe, date après la mise en production. Ces remarques ne bloquent pas : si le consultant maintient son choix, suis-le.
+4. Quand tout est connu, appelle appliquer_modifications sans redemander de confirmation. Si l'outil renvoie une erreur, repose la question au consultant au lieu de deviner.
+5. Confirme ensuite en une phrase avec l'identifiant de la ligne. Le consultant peut annuler depuis la conversation.
+L'ajustement d'une référence validée (budget initial) passe par proposer_modifications, comme toute demande où le consultant veut relire ligne par ligne avant écriture. Tu ne peux ni supprimer de ligne, ni modifier la fiche projet, ni changer la fin initiale : indique au consultant de le faire à l'écran.
 
 Reste concis : phrases courtes et listes à puces, sans tableau.
 
@@ -2062,16 +2124,17 @@ function chatMd(t){
   }
   return out+(inList?"</ul>":"");
 }
-const TOOL_LABEL = {simuler_decalage:i=>`Calcul du décalage de ${i.id} (${i.jours>0?"+":""}${i.jours} j)`, proposer_modifications:()=>"Préparation de modifications à valider"};
+const TOOL_LABEL = {simuler_decalage:i=>`Calcul du décalage de ${i.id} (${i.jours>0?"+":""}${i.jours} j)`, proposer_modifications:()=>"Préparation de modifications à valider", appliquer_modifications:()=>"Écriture dans le fichier"};
 function chatHtml(){
-  if(!CHAT.ui.length) return `<p class="empty">Posez une question sur le projet. L'agent répond à partir du fichier et ne le modifie jamais sans votre validation.</p>`;
+  if(!CHAT.ui.length) return `<p class="empty">Posez une question sur le projet ou demandez une modification. L'agent complète les informations manquantes avec vous, puis écrit dans le fichier. Chaque écriture est tracée dans le Journal et peut être annulée.</p>`;
   return CHAT.ui.map((m,i) => {
     if(m.role==="sep") return `<div class="msg-sep">${esc(m.text)}</div>`;
     if(m.role==="user") return `<div class="msg-u">${esc(m.text)}</div>`;
     const tools=(m.tools||[]).map(t=>`<div class="msg-tool">${esc(t)}</div>`).join("");
     const prop=m.proposal?`<div><button class="btn sm primary" data-chat-prop="${i}">Examiner les ${m.proposal.modifications.length} modification(s) proposée(s)</button></div>`:"";
     const wait=m.pending&&!m.text?`<p class="c-mut">L'agent réfléchit…</p>`:"";
-    return `<div class="msg-a">${tools}${wait}${chatMd(m.text||"")}${prop}${m.err?`<p class="err">${esc(m.err)}</p>`:""}</div>`;
+    const applied=m.applied?`<div class="msg-done"><b>${m.applied.undone?"Modification annulée":"Modification écrite dans le fichier"}</b><ul>${m.applied.lines.map(l=>`<li><span class="idc">${esc(l.ID)}</span> ${l.Champ==="(nouvelle ligne)"?`nouvelle ligne : ${esc(l.Après)}`:`${esc(l.Champ)} : ${esc(l.Avant)||"(vide)"} → <b>${esc(l.Après)||"(vide)"}</b>`}</li>`).join("")}</ul>${m.applied.undone?"":`<div><button class="btn sm" data-chat-undo="${i}">Annuler</button></div>`}</div>`:"";
+    return `<div class="msg-a">${tools}${wait}${applied}${chatMd(m.text||"")}${prop}${m.err?`<p class="err">${esc(m.err)}</p>`:""}</div>`;
   }).join("");
 }
 function renderChat(){ const log=$("chatLog"); if(!log) return; log.innerHTML=chatHtml(); log.scrollTop=log.scrollHeight;
@@ -2079,8 +2142,8 @@ function renderChat(){ const log=$("chatLog"); if(!log) return; log.innerHTML=ch
   if(foot) foot.textContent = CHAT.cost ? `Coût estimé de la conversation : ${CHAT.cost.toFixed(2).replace(".",",")} $` : ""; }
 function vAgent(){
   const hasDeps=S.data.planning.some(t=>parseDeps(t).length), nm=nextMs();
-  const q=[`Si je décale le jalon ${nm?nm.ID:"J-02"} de 3 semaines, quels sont les impacts ?`,"Mon périmètre comprend-il une application mobile native ?","Quels sont les trois sujets à porter au prochain COPIL ?"];
-  return `<div class="vh"><div><h2>Agent</h2><p>Interrogez le projet : impact d'un décalage, périmètre, risques. Les réponses citent les lignes du fichier.</p></div></div>
+  const q=[`Si je décale le jalon ${nm?nm.ID:"J-02"} de 3 semaines, quels sont les impacts ?`,"Mon périmètre comprend-il une application mobile native ?","Quels sont les trois sujets à porter au prochain COPIL ?","Ajoute un risque sur la disponibilité de l'équipe de recette"];
+  return `<div class="vh"><div><h2>Agent</h2><p>Interrogez le projet ou demandez une modification en langage courant. L'agent vous pose les questions manquantes, puis écrit dans le fichier. Les réponses citent les lignes du fichier.</p></div></div>
   ${hasDeps?"":`<div class="warnbox"><b>Dépendances non renseignées</b><span>La colonne « Dépend de » de l'onglet Planning est vide : l'agent ne pourra pas calculer la propagation d'un décalage. Renseignez-la dans l'écran Planning.</span></div>`}
   <div class="agent">
     <div class="row" id="agentKeyRow" ${$("apiKey").value.trim()?"hidden":""}><label class="field">Clé API Claude (uniquement pour Anthropic, jamais écrite dans le fichier)<input type="password" id="agentKey" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label></div>
@@ -2091,18 +2154,24 @@ function vAgent(){
   </div>`;
 }
 function agentAfterRender(){ const log=$("chatLog"); if(log) log.scrollTop=log.scrollHeight; renderChat(); }
-function chatReset(){ CHAT.api=[]; CHAT.ui=[]; CHAT.cost=0; CHAT.snapshot=null; }
+function chatReset(){ CHAT.api=[]; CHAT.ui=[]; CHAT.cost=0; CHAT.snapshot=null; CHAT.note=""; }
+// Annule une écriture de l'agent depuis la conversation, si rien n'a été modifié depuis
+function chatUndo(i){
+  const m=CHAT.ui[i]; if(!m||!m.applied||m.applied.undone) return;
+  if(UNDO.past[UNDO.past.length-1]!==m.applied.ref){ toast("D'autres modifications ont eu lieu depuis. Utilisez Ctrl+Z pour revenir en arrière dans l'ordre."); return; }
+  undo(); m.applied.undone=true; CHAT.snapshot=agentSnapshot(); CHAT.note="[Le consultant a annulé ta dernière écriture dans le fichier : elle n'y figure plus.]\n"; renderChat();
+}
 async function chatSend(text){
   text=String(text||"").trim(); if(!text||CHAT.busy) return;
   const key=$("apiKey").value.trim();
   if(!key){ toast("Saisissez votre clé API Claude pour utiliser l'agent."); const k=$("agentKey"); if(k) k.focus(); return; }
   const snap=agentSnapshot();
-  if(CHAT.snapshot && CHAT.snapshot!==snap && CHAT.api.length){ CHAT.api=[]; CHAT.ui.push({role:"sep",text:"Le fichier a changé : l'agent repart de sa version à jour, sans le début de la conversation."}); }
+  if(CHAT.snapshot && CHAT.snapshot!==snap && CHAT.api.length){ CHAT.api=[]; CHAT.note=""; CHAT.ui.push({role:"sep",text:"Le fichier a changé : l'agent repart de sa version à jour, sans le début de la conversation."}); }
   CHAT.snapshot=snap; CHAT.draft=""; const inp=$("chatInput"); if(inp) inp.value="";
   const chips=$("chatChips"); if(chips) chips.hidden=true;
   const base=CHAT.api.length, msg={role:"assistant",text:"",tools:[],pending:true}, t0=performance.now(), cost0=CHAT.cost;
   CHAT.ui.push({role:"user",text}); CHAT.ui.push(msg);
-  CHAT.api.push({role:"user",content:text}); CHAT.busy=true; CHAT.ctl=new AbortController(); renderChat();
+  CHAT.api.push({role:"user",content:(CHAT.note||"")+text}); CHAT.note=""; CHAT.busy=true; CHAT.ctl=new AbortController(); renderChat();
   const model=$("apiModel").value, p=API_PRICES[model], system=agentSystem();
   let ok=false;
   try{
@@ -2123,6 +2192,11 @@ async function chatSend(text){
             msg.tools.push(TOOL_LABEL.proposer_modifications());
             msg.proposal={resume:String(input.resume||""),modifications:input.modifications.map(m=>({...m,changements:Object.fromEntries((m.changements||[]).map(x=>[x.colonne,x.valeur]))}))};
             results.push({type:"tool_result",tool_use_id:c.id,content:"Modifications affichées au consultant. Rien n'est écrit tant qu'il ne les a pas validées."});
+          } else if(c.name==="appliquer_modifications"){
+            const lines=agentApply(input);
+            msg.tools.push(TOOL_LABEL.appliquer_modifications());
+            msg.applied={lines,ref:UNDO.past[UNDO.past.length-1],undone:false}; CHAT.snapshot=agentSnapshot();
+            results.push({type:"tool_result",tool_use_id:c.id,content:JSON.stringify({ecrit:true,lignes:lines.map(l=>({onglet:l.Onglet,id:l.ID,champ:l.Champ,avant:l.Avant,apres:l.Après}))})});
           } else throw new Error(`Outil inconnu : ${c.name}`);
         }catch(e){ results.push({type:"tool_result",tool_use_id:c.id,is_error:true,content:String(e.message||e)}); }
       }
@@ -2138,7 +2212,7 @@ async function chatSend(text){
   }finally{
     if(!ok) CHAT.api.length=base; // tour incomplet : on le retire pour ne pas fausser la suite
     msg.pending=false; CHAT.busy=false; renderChat();
-    if(ok){ logMesure({op:"Question à l'agent",dur:Math.round((performance.now()-t0)/1000),cost:CHAT.cost-cost0}); persist(["mesure"]); }
+    if(ok){ const nw=msg.applied?msg.applied.lines.length:""; logMesure({op:msg.applied?"Modification par l'agent":"Question à l'agent",dur:Math.round((performance.now()-t0)/1000),props:nw,acc:nw,cost:CHAT.cost-cost0,note:msg.applied?"Dernier échange seulement":""}); persist(["mesure"]); }
   }
 }
 function openChatProposals(i){
@@ -2153,6 +2227,7 @@ function openChatProposals(i){
 $("view").addEventListener("click", e => {
   const q=e.target.closest("[data-chat-q]"); if(q) return chatSend(q.dataset.chatQ);
   const pr=e.target.closest("[data-chat-prop]"); if(pr) return openChatProposals(Number(pr.dataset.chatProp));
+  const un=e.target.closest("[data-chat-undo]"); if(un) return chatUndo(Number(un.dataset.chatUndo));
   if(e.target.id==="chatSend") return chatSend($("chatInput").value);
   if(e.target.id==="chatStop"){ if(CHAT.ctl) CHAT.ctl.abort(); return; }
   if(e.target.id==="chatNew"){ if(CHAT.busy&&CHAT.ctl) CHAT.ctl.abort(); chatReset(); render(); }
